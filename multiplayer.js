@@ -92,20 +92,40 @@ function handAnswer(id,text){
  return {status:'unknown',suggest:'',why:'No confident answer'};
 }
 function parseJudgment(text,entrants){
- const t=String(text||'').trim();if(!t)return {status:'unknown'};
- const favored=[],rejected=[];
+ const t=String(text||'').replace(/\*[^*]*\*/g,' ').trim();
+ if(!t)return {status:'unknown',why:'Empty judge reply'};
+ const picks=[],negatives=[];
+ const explicit=(id,why)=>picks.push({id,why});
  for(let i=0;i<entrants.length;i++){
-  const letter=String.fromCharCode(65+i);
-  const regex=new RegExp('\\b(?:(?:card\\s+|option\\s+|entry\\s+)?'+letter+'|(?:card|option|entry|number)\\s+'+(i+1)+')\\b','gi');
-  for(const m of t.matchAll(regex)){
-   const before=t.slice(Math.max(0,m.index-40),m.index).toLowerCase();
-   const after=t.slice(m.index+m[0].length,m.index+m[0].length+65).toLowerCase();
-   if(/^\s*(?:is|was)?\s*(?:the\s+)?(?:worst|terrible|awful|bad|not|loses?|disqualified)\b/.test(after)||/\b(?:not|reject|against)\s*$/.test(before))rejected.push(entrants[i]);
-   else if(/^\s*(?:is|was)?\s*(?:the\s+)?(?:best|winner|funniest|strongest|my\s+pick|wins?|gets\s+my\s+vote|takes\s+it|takes\s+the\s+point)\b/.test(after)||/\b(?:pick|choose|chose|select|vote|winner(?:\s+is)?|go\s+with)\s*$/.test(before))favored.push(entrants[i]);
+  const id=entrants[i],letter=String.fromCharCode(65+i),digit=String(i+1);
+  const marker='(?:'+letter+'|(?:card|option|entry|number)\\s*(?:'+letter+'|'+digit+'))';
+  const mark=new RegExp('\\b'+marker+'\\b','gi');
+  for(const m of t.matchAll(mark)){
+   const pre=t.slice(Math.max(0,m.index-48),m.index);
+   const post=t.slice(m.index+m[0].length,m.index+m[0].length+100);
+   if(/^\s*(?:is|was|would be)?\s*(?:the\s+)?(?:worst|terrible|awful|bad|not|loses?|disqualified|last\s+place)\b/i.test(post)||/\b(?:not|reject|against)\s*$/i.test(pre)){negatives.push(id);continue;}
+   if(/^\s*(?:is|was|would be)?\s*(?:the\s+)?(?:best|winner|funniest|strongest|my\s+pick|wins?|gets\s+my\s+vote|takes\s+the\s+point)\b/i.test(post)||/\b(?:pick|choose|chose|select|vote|winner(?:\s+is)?|go\s+with|give\s+it\s+to)\s*$/i.test(pre)){explicit(id,'Explicit winner statement');continue;}
+   // A standalone "C." followed by the winning answer or a declaration:
+   if(new RegExp('(?:^|[\\n.!?]\\s*)'+letter+'\\s*[.:)\\-]','i').test(t.slice(Math.max(0,m.index-3),m.index+letter.length+3))){
+    const after=t.slice(m.index+letter.length,m.index+190);
+    const answer=st.current?.answers?.[id]||'';
+    const next=after.replace(/^[\s.:)–—-]+/,'').split(/[.!?\n]/)[0];
+    if((answer&&clean(next).includes(clean(answer).slice(0,Math.min(25,clean(answer).length))))||/\b(?:that's|that is|this is)\s+(?:the\s+)?(?:winning|winner|best)\b/i.test(after))explicit(id,'Standalone judge choice');
+   }
+  }
+  const answer=st.current?.answers?.[id]||'';
+  if(answer&&clean(answer).length>8){
+   const ans=clean(answer),reply=clean(t);
+   const pos=reply.indexOf(ans);
+   if(pos>=0){
+    const after=reply.slice(pos+ans.length,pos+ans.length+135);
+    const before=reply.slice(Math.max(0,pos-35),pos);
+    if(/\b(?:wins?|winner|best|my pick|my choice|takes it|gets the point)\b/.test(after)||/\b(?:pick|choose|chose|winner is|go with)\b/.test(before))explicit(id,'Winning answer named');
+   }
   }
  }
- const winners=[...new Set(favored.filter(id=>!rejected.includes(id)))];
- return winners.length===1?{status:'suggest',id:winners[0],why:'Explicit positive vote'}:{status:'unknown',why:winners.length>1?'Conflicting votes':'No explicit selection'};
+ const unique=[...new Set(picks.filter(p=>!negatives.includes(p.id)).map(p=>p.id))];
+ return unique.length===1?{status:'suggest',id:unique[0],why:picks.find(p=>p.id===unique[0])?.why||'Judge choice'}:{status:'unknown',why:unique.length>1?'Conflicting possible winners':'No reliable winner identified'};
 }
 function cStatus(id){const c=st.current;return c.answers[id]?'✓ Answer locked':c.delivery[id]==='uncertain'?'⚠ Delivery uncertain':c.delivery[id]==='sent'?'Waiting for answer':'Not sent'}
 function collect(){
