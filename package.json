@@ -1,0 +1,1 @@
+{"name":"questionable-company","version":"1.3.0","private":true,"type":"module","scripts":{"test":"node --check game.js && node --check api/chat.js && node --check api/nomis.js"}}
