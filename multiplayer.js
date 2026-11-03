@@ -57,7 +57,7 @@ const c=st.current;return 'Questionable Company — Round '+st.round+'/'+st.roun
 }
 function judgeText(){
 const c=st.current;const names=c.entrants.map((id,i)=>String.fromCharCode(65+i)+'. '+c.answers[id]).join('\n');
-return 'Questionable Company — Round '+st.round+' judging\nPrompt: '+c.prompt+'\nYou are the judge this round, '+who(c.judge)+'. Choose the winning entry by letter (A, B or C):\n'+names+'\nThe entries are anonymous. You may respond naturally.';
+return 'Questionable Company — Round '+st.round+' judging\nPrompt: '+c.prompt+'\nYou are the judge this round, '+who(c.judge)+'. Choose the winning entry by letter (A–'+String.fromCharCode(64+c.entrants.length)+'):\n'+names+'\nThe entries are anonymous. You may respond naturally.';
 }
 function resultText(){
 const c=st.current;const entries=c.entrants.map(id=>who(id)+': '+c.answers[id]).join('\n');
@@ -116,6 +116,8 @@ function handAnswer(id,text){
 function parseJudgment(text,entrants){
  const t=String(text||'').replace(/\*[^*]*\*/g,' ').trim();
  if(!t)return {status:'unknown',why:'Empty judge reply'};
+ const leading=t.match(/^\s*(?:my\s+(?:pick|vote|choice)\s*(?:is|:)?\s*)?([A-E])\s*[.):—–-]\s*(.*)$/i);
+ if(leading){const index=leading[1].toUpperCase().charCodeAt(0)-65;const tail=leading[2]||'';if(index<entrants.length&&!/^\s*(?:is\s+)?(?:the\s+)?(?:worst|bad|awful|terrible|not|loses?|disqualified)\b/i.test(tail))return {status:'suggest',id:entrants[index],why:'Leading lettered ruling'};}
  const picks=[],negatives=[];
  const explicit=(id,why)=>picks.push({id,why});
  for(let i=0;i<entrants.length;i++){
