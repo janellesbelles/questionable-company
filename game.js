@@ -62,15 +62,29 @@ function parseAnswer(raw){let s=raw.trim();if(!s)return {type:'empty'};let lower
    const m=s.match(/\b(?:buried|bury(?:ing)?)\s+with\s+([^.!?\n*]{3,110})/i);
    if(m)found=trimAnswer(m[1]);
  }
- if(!found){
-   const m=s.match(/\b(?:my (?:original |freestyle )?answer is|i(?:'ll| will) (?:go with|submit)|i(?:'m| am) (?:going with|choosing))\s+([^.!?\n*]{3,110})/i);
+ // For freestyle replies, prefer the actual sentence completing the black
+ // card over an announcement such as "I'll go with an original answer".
+ if(signalsOriginal && !found){
+   const premise=state.prompt.replace(/_+/g,' ').replace(/[.!?]+$/,'').trim();
+   const anchor=premise.match(/^(.*?)\s+(?:was not designed for|was interrupted by|introduced|featured|was ruined by|can only be lifted by|was to be buried with)\s*$/i);
+   // Common natural-language continuation: "The confession booth was not
+   // designed for a fat guy ..." — retain the actual answer, not the setup.
+   const m=s.match(/\b(?:was not designed for|was interrupted by|introduced|featured|was ruined by|can only be lifted by|buried with)\s+([^.!?\n*]{3,190})/i);
    if(m)found=trimAnswer(m[1]);
  }
+ if(!found){
+   const m=s.match(/\b(?:my (?:original |freestyle )?answer is|i(?:'ll| will) (?:go with|submit)|i(?:'m| am) (?:going with|choosing))\s+([^.!?\n*]{3,150})/i);
+   if(m)found=trimAnswer(m[1]);
+ }
+ // Announcing a freestyle answer is not itself a playable submission.
+ const metaOnly=/^(?:(?:an?|the|my)\s+)?(?:original|freestyle|custom|own)\s+answer(?:\s+(?:this time|instead|for this round|please))?$/i;
+ if(metaOnly.test(found))found='';
+ if(found && /^an? (?:original|freestyle|custom) answer\b/i.test(found))found='';
  if(!found){
    const m=s.match(/\b(?:so yeah|so yep|final answer)[,: ]+([^.!?\n*]{3,90}?)\s+(?:it is|that's it)[.!?]/i);
    if(m)found=trimAnswer(m[1]);
  }
- if(found && found.split(/\s+/).length<=22){
+ if(found && found.split(/\s+/).length<=32){
    if(signalsOriginal)return {type:'custom',value:found,why:'Original answer recognized'};
    return {type:'suggest-custom',value:found,why:'Possible freestyle answer'};
  }
