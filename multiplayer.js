@@ -103,12 +103,21 @@ const resp=await fetch(path,{method,headers:{'x-nomi-api-key':key,...(body?{'Con
 const data=await resp.json();if(!resp.ok)throw Error(data.error||'Nomi API error');
 return data;
 }
+function partsOf(message){
+if(message.length<=LIMIT)return [message];
+const maxChunk=650;
+const blocks=[];let rest=message;
+while(rest.length>maxChunk){let end=rest.lastIndexOf('\n',maxChunk);if(end<160)end=rest.lastIndexOf(' ',maxChunk);if(end<160)end=maxChunk;blocks.push(rest.slice(0,end).trim());rest=rest.slice(end).trim()}
+if(rest)blocks.push(rest);
+return blocks.map((part,i)=>(i+1)+'/'+blocks.length+' — '+(i===blocks.length-1?'Final part.':'More information follows; please wait for all parts.')+'\n'+part+(i===blocks.length-1?'\nYou may respond now.':''));
+}
 async function send(id,message){
-if(maxed(message))throw Error('Message exceeds 800 characters. Shorten this round before sending.');
-if(!confirm('Push this message to '+who(id)+' now?'))return null;
+const parts=partsOf(message);
+if(parts.some(maxed)){note='This message exceeds the 800-character limit even after splitting.';render();return null}
+if(!confirm('Push '+parts.length+' message'+(parts.length===1?'':'s')+' to '+who(id)+' now?'))return null;
 busy=true;note='Waiting for Nomi API. This may take several minutes.';render();
-try{return await api('/api/chat','POST',{nomiId:id,message})}
-catch(e){note='Delivery uncertain: '+e.message+' Check the Nomi conversation before resending.';return null}
+try{let last=null;for(let i=0;i<parts.length;i++){last=await api('/api/chat','POST',{nomiId:id,message:parts[i]});note='Delivered part '+(i+1)+' of '+parts.length+'.'}return last}
+catch(e){note='Delivery uncertain: '+e.message+' Check the Nomi conversation before resending; earlier parts may have arrived.';return null}
 finally{busy=false}
 }
 function finishJudge(id){const c=st.current;if(!c.entrants.includes(id))return; c.judgeChoice=id;st.scores[id]=(st.scores[id]||0)+1;c.status='results';st.stage='results';save();render()}
