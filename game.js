@@ -11,7 +11,7 @@ const decks={
 };
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rand=a=>a[Math.floor(Math.random()*a.length)]; const shuffle=a=>[...a].sort(()=>Math.random()-.5);
-let state={stage:'setup',category:'spicy',human:'Player',nomi:'Nomi',rounds:5,round:0,scores:{human:0,nomi:0},usedBlack:[],usedWhite:[],hand:[],nomiHand:[],humanHand:[],prompt:'',humanAnswer:'',nomiAnswer:'',nomiRaw:'',nomiSource:'',nomiStatus:'',suggestedAnswer:'',judge:'',verdict:'',reaction:'',customBlack:[],pendingBlack:'',copied:{},replyDraft:'',manualWinner:'auto'};
+let state={stage:'setup',category:'spicy',human:'',nomi:'Nomi',rounds:5,round:0,scores:{human:0,nomi:0},usedBlack:[],usedWhite:[],hand:[],nomiHand:[],humanHand:[],prompt:'',humanAnswer:'',nomiAnswer:'',nomiRaw:'',nomiSource:'',nomiStatus:'',suggestedAnswer:'',judge:'',verdict:'',reaction:'',customBlack:[],pendingBlack:'',copied:{},replyDraft:'',manualWinner:'auto'};
 try{let saved=localStorage.getItem(STORAGE);if(saved){let data=JSON.parse(saved);if(data && data.stage && decks[data.category]){state={...state,...data};if(!Array.isArray(data.nomiHand)||!data.nomiHand.length)state.nomiHand=[...(data.hand||[])];if(!Array.isArray(data.humanHand)||!data.humanHand.length){let leftovers=shuffle(cardPool().filter(c=>!state.nomiHand.includes(c)));state.humanHand=leftovers.slice(0,5);} }}}catch{}
 function persist(){try{localStorage.setItem(STORAGE,JSON.stringify(state))}catch{}}
 function patch(p){Object.assign(state,p);persist();render()}
