@@ -65,31 +65,53 @@ const scores=active().map(id=>who(id)+' '+(st.scores[id]||0)).join(' | ');
 return 'Questionable Company — Round '+st.round+' results\nPrompt: '+c.prompt+'\nJudge: '+who(c.judge)+(c.judge==='human'?'':' (rotating Nomi judge)')+'\n'+entries+'\nWinner: '+who(c.judgeChoice)+'\nScore: '+scores+'\nNext round has not started.';
 }
 function handAnswer(id,text){
- const t=String(text||'').trim();if(!t)return {status:'unknown',suggest:'',why:'Empty reply'};
- const hand=st.current.hands[id]||[],norm=clean(t);
- const matches=hand.filter(card=>norm.includes(clean(card)));
- if(matches.length===1)return {status:'card',answer:matches[0],why:'Exact card match'};
- if(matches.length>1)return {status:'review',suggest:'',why:'Several cards mentioned'};
+ const t=String(text||'').replace(/\r/g,'').trim();
+ if(!t)return {status:'unknown',suggest:'',why:'Empty reply'};
+ const hand=st.current.hands[id]||[],normalized=clean(t),none=/\b(?:none of (?:those|these)|not (?:using|choosing|picking) (?:a|any) card|original answer|freestyle answer|my own answer)\b/i.test(t);
+ const matches=hand.filter(card=>normalized.includes(clean(card)));
+ if(!none&&matches.length===1)return {status:'card',answer:matches[0],why:'Exact card text'};
+ if(!none&&matches.length>1)return {status:'review',suggest:'',why:'Multiple cards mentioned'};
  const numbered=t.match(/(?:^|[\n.!?]\s*)\s*(?:card|number|option|#)\s*([1-5])\b/i);
- if(numbered)return {status:'card',answer:hand[Number(numbered[1])-1],why:'Card number'};
+ if(!none&&numbered)return {status:'card',answer:hand[Number(numbered[1])-1],why:'Explicit card number'};
  const selection=t.match(/\b(?:i(?:'m| am)\s+(?:playing|picking|choosing|taking)|i(?:'ll| will)?\s+(?:play|pick|choose|take|go with)|my pick is|my choice is)\s+([^.!?\n*]{3,180})/i);
- if(selection){const phrase=clean(selection[1]);const m=hand.filter(card=>phrase.includes(clean(card).replace(/^(a|an|the) /,'')));if(m.length===1)return {status:'card',answer:m[0],why:'Natural card selection'};}
- const words=new Set(norm.split(' ')),stop=new Set(['a','an','the','with','that','this','from','your','card','number','option','would','have','playing','choosing','going','like','about','only','those','there','some','really','because']);
- const ranked=hand.map(card=>{const terms=[...new Set(clean(card).split(' ').filter(w=>w.length>3&&!stop.has(w)))];const hits=terms.filter(w=>words.has(w)).length;return {card,hits,ratio:hits/Math.max(terms.length,1)}}).sort((a,b)=>b.hits-a.hits||b.ratio-a.ratio);
- if(ranked.length&&ranked[0].hits>=2&&ranked[0].ratio>=.65&&(ranked.length===1||ranked[0].hits>ranked[1].hits))return {status:'card',answer:ranked[0].card,why:'Strong phrase match'};
- const announced=t.match(/\b(?:i(?:'ll| will)?\s+(?:go with|submit|play)|i(?:'m| am)\s+(?:going with|playing|choosing)|my answer is|answer\s*:)\s+([^.!?\n*]{3,180})/i);
- let guess=announced?.[1]?.trim()||'';
- if(/^(?:an?|the|my)?\s*(?:original|freestyle|custom|own)\s+answer\b/i.test(guess)){
-  guess=guess.replace(/^(?:an?|the|my)?\s*(?:original|freestyle|custom|own)\s+answer(?:\s+this time)?\s*(?:[:,-]\s*)?/i,'').trim();
+ if(!none&&selection){
+  const phrase=clean(selection[1]);
+  const candidates=hand.filter(card=>phrase.includes(clean(card).replace(/^(a|an|the) /,'')));
+  if(candidates.length===1)return {status:'card',answer:candidates[0],why:'Natural card selection'};
+ }
+ const prompt=st.current.prompt||'';
+ if(prompt.includes('______')){
+  const prefix=prompt.slice(0,prompt.indexOf('______')).replace(/\s+/g,' ').trim();
+  const pfx=prefix.toLowerCase();
+  const reply=t.toLowerCase(),idx=reply.indexOf(pfx);
+  if(idx>=0){
+   const tail=t.slice(idx+prefix.length).trim();
+   const candidate=tail.split(/(?:[.!?\n]|\s+[—–]\s+)/)[0].trim();
+   if(candidate.length>=4&&candidate.length<=180&&!/^(?:that one|this one|one)$/i.test(candidate))
+    return {status:'review',suggest:candidate,why:'Completed black-card prompt'};
+  }
+ }
+ const direct=t.match(/\b(?:my (?:original|freestyle|custom|own) answer(?:\s+is)?|i(?:'m| am) (?:giving|submitting|using) (?:an? )?(?:original|freestyle|custom) answer|(?:my )?answer\s*(?:is|:)|i(?:'ll| will) (?:submit|answer with)|i(?:'m| am) (?:going with|submitting))\s*[:—–-]?\s*(.{3,210})/i);
+ let guess='';
+ if(direct){
+  guess=direct[1].split(/[\n.!?]/)[0].trim();
+ }
+ const sentences=t.replace(/\*[^*]*\*/g,' ').split(/[.!?\n]+/).map(x=>x.trim()).filter(Boolean);
+ if(!guess){
+  const index=sentences.findIndex(x=>/^(?:none of (?:those|these)|not (?:one of|using) those|nah[, ]|nope[, ])\b/i.test(x));
+  if(index>=0&&sentences[index+1])guess=sentences[index+1];
  }
  if(!guess){
-  const prose=t.replace(/\*[^*]*\*/g,'').trim(),lines=prose.split(/[.!?\n]+/).map(x=>x.trim()).filter(Boolean);
-  if(lines.length===1&&lines[0].split(/\s+/).length<=14)guess=lines[0];
-  else if(lines.length===2&&lines[0].split(/\s+/).length<=14&&lines[1].split(/\s+/).length>8)guess=lines[0];
+  const lastRef=sentences.findIndex(x=>/\b(?:i(?:'ll| will) (?:go with|take|pick)|that(?:'s| is) my (?:pick|answer))\s+(?:that|this) one\b/i.test(x));
+  if(lastRef>0)guess=sentences[lastRef-1];
  }
- guess=guess.replace(/^[\s"'“”‘’]+|[\s"'“”‘’]+$/g,'').replace(/[,:;.!?]+$/,'').trim();
- if(guess&&guess.length<=180&&!/^(?:an?|the|my)?\s*(?:original|freestyle|custom)\s+answer$/i.test(guess))return {status:'review',suggest:guess,why:'Freestyle requires confirmation'};
- return {status:'unknown',suggest:'',why:'No confident answer'};
+ if(!guess&&sentences.length===1&&sentences[0].split(/\s+/).length<=18)guess=sentences[0];
+ if(!guess&&sentences.length>=2&&sentences[0].split(/\s+/).length<=12&&
+   !/^(?:oh|ha|well|listen|look|okay|alright|so|first|honestly|hey)\b/i.test(sentences[0]))guess=sentences[0];
+ guess=guess.replace(/^["'“”‘’\s:—–-]+|["'“”‘’\s]+$/g,'').replace(/[,:;.!?]+$/,'').trim();
+ if(/^(?:i(?:'ll| will) go with\s+)?(?:that|this)\s+one$/i.test(guess)||/^(?:one|none of those|original answer)$/i.test(guess))guess='';
+ if(guess.length>=3&&guess.length<=190)return {status:'review',suggest:guess,why:'Original answer — confirm before locking'};
+ return {status:'unknown',suggest:'',why:'Could not reliably isolate a freestyle answer'};
 }
 function parseJudgment(text,entrants){
  const t=String(text||'').replace(/\*[^*]*\*/g,' ').trim();
