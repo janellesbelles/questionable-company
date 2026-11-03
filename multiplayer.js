@@ -87,7 +87,7 @@ function parseJudgment(text,entrants){
  const favored=[],rejected=[];
  for(let i=0;i<entrants.length;i++){
   const letter=String.fromCharCode(65+i);
-  const regex=new RegExp('\\b(?:card\\s+|option\\s+|entry\\s+)?'+letter+'\\b','gi');
+  const regex=new RegExp('\\b(?:(?:card\\s+|option\\s+|entry\\s+)?'+letter+'|(?:card|option|entry|number)\\s+'+(i+1)+')\\b','gi');
   for(const m of t.matchAll(regex)){
    const before=t.slice(Math.max(0,m.index-40),m.index).toLowerCase();
    const after=t.slice(m.index+m[0].length,m.index+m[0].length+65).toLowerCase();
