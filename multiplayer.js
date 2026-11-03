@@ -2,7 +2,16 @@
 /* Questionable Company multi-Nomi beta. Browser-local save; personal API key is memory-only. */
 (function(){
 const root=document.getElementById('multi-app');
-const STORE='qc-multinomi-beta-1', LIMIT=800, MAX_NOMIS=3;
+const STORE='qc-multinomi-beta-1', LIMIT=800, MAX_NOMIS=5;
+const EXTRA_CARDS={
+mild:["A raccoon carrying a tiny briefcase.","A deeply suspicious inflatable flamingo.","The world's least qualified magician.","A committee of frogs in business casual.","A goose demanding a written apology.","A birthday cake with legal representation.","A tiny parade of disgruntled snails.","A motivational speech from a potato.","An office plant with a secret identity.","A very nervous cardboard astronaut."],
+spicy:["An ex presenting a 90-slide breakup analysis.","A disastrous surprise honeymoon itinerary.","A karaoke duet with a former nemesis.","An apology bouquet made of expired coupons.","A romantic getaway sponsored by bad decisions.","A breakup text delivered by marching band.","A dating profile written by an accountant.","A candlelit dinner with an HR representative.","A very suggestive PowerPoint transition.","A failed attempt at seductive ventriloquism."],
+goblin:["A cursed air fryer whispering family secrets.","A phantom accountant demanding back taxes.","A skeleton applying for emotional damages.","An extremely judgmental funeral director.","A wedding cake full of old grudges.","A haunted lawn chair with unresolved trauma.","A vampire who fainted at a blood drive.","A demon stuck on hold with customer service.","A tiny cryptid with a restraining order.","A possessed printer producing obituaries."],
+romance:["A handwritten love letter from the tax office.","A blind date arranged by a spiteful ghost.","A bouquet of deeply judgmental roses.","An anniversary dinner interrupted by raccoons.","A marriage proposal delivered by carrier pigeon.","A romantic picnic in a haunted parking lot.","A secret admirer who sends invoices.","A wedding officiant who forgot the names.","A heartfelt poem written on a receipt.","An engagement ring hidden in a meatball."],
+work:["An intern with a suspiciously large spreadsheet.","A CEO giving a keynote from a bounce house.","An office chair demanding paid leave.","A mandatory retreat to a haunted warehouse.","An HR memo written by a raccoon.","A fax machine receiving threats from the future.","A promotion awarded by coin toss.","A performance review conducted by a parrot.","A meeting that could have been a nap.","A hostile takeover by office plants."],
+fantasy:["A wizard unable to pass the driving test.","A dragon with a severe pollen allergy.","An enchanted sword requesting sick leave.","A goblin with an unreasonable mortgage.","A royal jester demanding a pension.","A prophecy written on a grocery receipt.","A talking mushroom with royal ambitions.","A knight afraid of mildly damp socks.","A spellbook containing only soup recipes.","An ancient curse of inconvenient hiccups."]
+};
+for(const [category,cards] of Object.entries(EXTRA_CARDS)){if(decks[category])decks[category].white=[...new Set([...decks[category].white,...cards])];}
 let key='',nomis=[],busy=false,note='Connect your own Nomi API key to select companions.';
 let st={stage:'setup',category:'goblin',human:'',selected:[],rounds:5,round:0,scores:{},history:[],current:null,usedBlack:[],usedWhite:[]};
 try{const saved=JSON.parse(localStorage.getItem(STORE)||'null');if(saved&&saved.stage&&decks[saved.category])st={...st,...saved}}catch{}
@@ -18,10 +27,10 @@ function status(){return '<div class="status">'+esc(note)+'</div>'}
 function button(id,label,disabled=false,cls='secondary'){return '<button class="'+cls+'" data-do="'+id+'" '+(disabled||busy?'disabled':'')+'>'+esc(label)+'</button>'}
 function identity(){return '<div class="inline" style="justify-content:space-between"><span class="tag">Multi-Nomi beta · '+esc(st.stage)+'</span><span class="tag">Round '+st.round+' / '+st.rounds+'</span></div>'}
 function setup(){
-return '<section class="panel"><h1>Multi-Nomi courtroom 🪿</h1><p class="small">Two or three Nomis plus you. Each round, one person judges and does not submit an answer. Every message requires your click; nobody gets auto-prompted.</p>'+
+return '<section class="panel"><h1>Multi-Nomi courtroom 🪿</h1><p class="small">Two to five Nomis plus you. Each round, one person judges and does not submit an answer. Every message requires your click; nobody gets auto-prompted.</p>'+
 '<div class="split"><div><label>Your name</label><input id="mHuman" maxlength="35" value="'+esc(st.human)+'" placeholder="Enter your name"></div><div><label>Category</label><select id="mCategory">'+Object.entries(decks).map(([id,d])=>'<option value="'+id+'" '+(id===st.category?'selected':'')+'>'+esc(d.name)+'</option>').join('')+'</select></div></div>'+
 '<label>Your personal Nomi API key (not saved)</label><input type="password" id="mKey" autocomplete="off" value="'+esc(key)+'" placeholder="API key">'+button('connect','Connect & list Nomis')+
-'<h3>Choose 2–3 Nomis</h3><p class="small">The display names below can be edited to nicknames. Names are only for this game.</p>'+
+'<h3>Choose 2–5 Nomis</h3><p class="small">The display names below can be edited to nicknames. Names are only for this game.</p>'+
 (nomis.length?nomis.map(n=>{const selected=st.selected.find(x=>x.uuid===n.uuid);return '<div class="multi-person"><label><input type="checkbox" data-pick="'+esc(n.uuid)+'" '+(selected?'checked':'')+'> '+esc(n.name)+'</label>'+(selected?'<input data-name="'+esc(n.uuid)+'" maxlength="35" value="'+esc(selected.display)+'">':'')+'</div>'}).join(''):'<p class="small">Connect first. Previously selected Nomis may reappear when the list loads.</p>')+
 '<label>Rounds</label><select id="mRounds">'+[5,10,15].map(n=>'<option value="'+n+'" '+(st.rounds===n?'selected':'')+'>'+n+' rounds</option>').join('')+'</select>'+
 status()+button('start','Start multiplayer game',st.selected.length<2||st.selected.length>MAX_NOMIS,'primary')+
@@ -158,7 +167,7 @@ if(e.target.id==='mJudgeReply'&&st.current){st.current.commentary=e.target.value
 root.addEventListener('change',e=>{
 if(e.target.id==='mCategory'){st.category=e.target.value;save()}
 if(e.target.id==='mRounds'){st.rounds=Number(e.target.value);save()}
-if(e.target.dataset.pick){const id=e.target.dataset.pick,found=nomis.find(n=>n.uuid===id);if(e.target.checked){if(st.selected.length>=MAX_NOMIS){e.target.checked=false;note='Maximum three Nomis in this beta.';render();return}if(found&&!st.selected.some(n=>n.uuid===id))st.selected.push({uuid:id,display:found.name})}else st.selected=st.selected.filter(n=>n.uuid!==id);save();render()}
+if(e.target.dataset.pick){const id=e.target.dataset.pick,found=nomis.find(n=>n.uuid===id);if(e.target.checked){if(st.selected.length>=MAX_NOMIS){e.target.checked=false;note='Maximum five Nomis in this beta.';render();return}if(found&&!st.selected.some(n=>n.uuid===id))st.selected.push({uuid:id,display:found.name})}else st.selected=st.selected.filter(n=>n.uuid!==id);save();render()}
 });
 root.addEventListener('click',async e=>{
 const hand=e.target.closest('[data-hand]');if(hand&&st.stage==='collect'){st.current.answers.human=st.current.hands.human[Number(hand.dataset.hand)];save();render();return}
