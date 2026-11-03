@@ -104,9 +104,9 @@ function parseJudgment(text,entrants){
    const pre=t.slice(Math.max(0,m.index-48),m.index);
    const post=t.slice(m.index+m[0].length,m.index+m[0].length+100);
    if(/^\s*(?:is|was|would be)?\s*(?:the\s+)?(?:worst|terrible|awful|bad|not|loses?|disqualified|last\s+place)\b/i.test(post)||/\b(?:not|reject|against)\s*$/i.test(pre)){negatives.push(id);continue;}
-   if(/^\s*(?:is|was|would be)?\s*(?:the\s+)?(?:best|winner|funniest|strongest|my\s+pick|wins?|gets\s+my\s+vote|takes\s+the\s+point)\b/i.test(post)||/\b(?:pick|choose|chose|select|vote|winner(?:\s+is)?|go\s+with|give\s+it\s+to)\s*$/i.test(pre)){explicit(id,'Explicit winner statement');continue;}
+   if(/^\s*(?:is|was|would be)?\s*(?:the\s+)?(?:best|winner|funniest|strongest|my\s+pick|wins?|gets\s+my\s+vote|takes\s+the\s+point)\b/i.test(post)||/\b(?:pick|picking|choose|choosing|chose|select|vote|winner(?:\s+is)?|go\s+with|give\s+it\s+to)\s*$/i.test(pre)){explicit(id,'Explicit winner statement');continue;}
    // A standalone "C." followed by the winning answer or a declaration:
-   if(new RegExp('(?:^|[\\n.!?]\\s*)'+letter+'\\s*[.:)\\-]','i').test(t.slice(Math.max(0,m.index-3),m.index+letter.length+3))){
+   if(new RegExp('(?:^|[,\\n.!?]\\s*)'+letter+'\\s*[.:)\\-]','i').test(t.slice(Math.max(0,m.index-3),m.index+letter.length+3))){
     const after=t.slice(m.index+letter.length,m.index+190);
     const answer=st.current?.answers?.[id]||'';
     const next=after.replace(/^[\s.:)–—-]+/,'').split(/[.!?\n]/)[0];
