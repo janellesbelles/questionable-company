@@ -56,20 +56,47 @@ const scores=active().map(id=>who(id)+' '+(st.scores[id]||0)).join(' | ');
 return 'Questionable Company — Round '+st.round+' results\nPrompt: '+c.prompt+'\nJudge: '+who(c.judge)+(c.judge==='human'?'':' (rotating Nomi judge)')+'\n'+entries+'\nWinner: '+who(c.judgeChoice)+'\nScore: '+scores+'\nNext round has not started.';
 }
 function handAnswer(id,text){
-const t=text.trim();if(!t)return {status:'unknown',suggest:''};
-const hand=st.current.hands[id],normalized=clean(t);
-const matches=hand.filter(x=>normalized.includes(clean(x)));
-if(matches.length===1)return {status:'card',answer:matches[0]};
-const num=t.match(/\b(?:card|number|option)\s*([1-5])\b/i);
-if(num)return {status:'card',answer:hand[Number(num[1])-1]};
-if(matches.length>1)return {status:'unknown',suggest:''};
-const c=t.match(/\b(?:i(?:'ll| will)? (?:go with|choose|pick|submit)|my answer is|answer:)\s+([^.!?\n*]{4,190})/i);
-let answer=c?.[1]?.trim()||'';
-if(/^(an?|the|my)?\s*(original|freestyle|custom)\s+answer\b/i.test(answer)){
-const continuation=t.match(/\b(?:was not designed for|was interrupted by|was ruined by|buried with|unveiled|is|was|featured)\s+([^.!?\n*]{6,170})/i);
-answer=continuation?.[1]?.trim()||'';
+ const t=String(text||'').trim();if(!t)return {status:'unknown',suggest:'',why:'Empty reply'};
+ const hand=st.current.hands[id]||[],norm=clean(t);
+ const matches=hand.filter(card=>norm.includes(clean(card)));
+ if(matches.length===1)return {status:'card',answer:matches[0],why:'Exact card match'};
+ if(matches.length>1)return {status:'review',suggest:'',why:'Several cards mentioned'};
+ const numbered=t.match(/(?:^|[\n.!?]\s*)\s*(?:card|number|option|#)\s*([1-5])\b/i);
+ if(numbered)return {status:'card',answer:hand[Number(numbered[1])-1],why:'Card number'};
+ const selection=t.match(/\b(?:i(?:'m| am)\s+(?:playing|picking|choosing|taking)|i(?:'ll| will)?\s+(?:play|pick|choose|take|go with)|my pick is|my choice is)\s+([^.!?\n*]{3,180})/i);
+ if(selection){const phrase=clean(selection[1]);const m=hand.filter(card=>phrase.includes(clean(card).replace(/^(a|an|the) /,'')));if(m.length===1)return {status:'card',answer:m[0],why:'Natural card selection'};}
+ const words=new Set(norm.split(' ')),stop=new Set(['a','an','the','with','that','this','from','your','card','number','option','would','have','playing','choosing','going','like','about','only','those','there','some','really','because']);
+ const ranked=hand.map(card=>{const terms=[...new Set(clean(card).split(' ').filter(w=>w.length>3&&!stop.has(w)))];const hits=terms.filter(w=>words.has(w)).length;return {card,hits,ratio:hits/Math.max(terms.length,1)}}).sort((a,b)=>b.hits-a.hits||b.ratio-a.ratio);
+ if(ranked.length&&ranked[0].hits>=2&&ranked[0].ratio>=.65&&(ranked.length===1||ranked[0].hits>ranked[1].hits))return {status:'card',answer:ranked[0].card,why:'Strong phrase match'};
+ const announced=t.match(/\b(?:i(?:'ll| will)?\s+(?:go with|submit|play)|i(?:'m| am)\s+(?:going with|playing|choosing)|my answer is|answer\s*:)\s+([^.!?\n*]{3,180})/i);
+ let guess=announced?.[1]?.trim()||'';
+ if(/^(?:an?|the|my)?\s*(?:original|freestyle|custom|own)\s+answer\b/i.test(guess)){
+  guess=guess.replace(/^(?:an?|the|my)?\s*(?:original|freestyle|custom|own)\s+answer(?:\s+this time)?\s*(?:[:,-]\s*)?/i,'').trim();
+ }
+ if(!guess){
+  const prose=t.replace(/\*[^*]*\*/g,'').trim(),lines=prose.split(/[.!?\n]+/).map(x=>x.trim()).filter(Boolean);
+  if(lines.length===1&&lines[0].split(/\s+/).length<=14)guess=lines[0];
+  else if(lines.length===2&&lines[0].split(/\s+/).length<=14&&lines[1].split(/\s+/).length>8)guess=lines[0];
+ }
+ guess=guess.replace(/^[\s"'“”‘’]+|[\s"'“”‘’]+$/g,'').replace(/[,:;.!?]+$/,'').trim();
+ if(guess&&guess.length<=180&&!/^(?:an?|the|my)?\s*(?:original|freestyle|custom)\s+answer$/i.test(guess))return {status:'review',suggest:guess,why:'Freestyle requires confirmation'};
+ return {status:'unknown',suggest:'',why:'No confident answer'};
 }
-return {status:'review',suggest:answer};
+function parseJudgment(text,entrants){
+ const t=String(text||'').trim();if(!t)return {status:'unknown'};
+ const favored=[],rejected=[];
+ for(let i=0;i<entrants.length;i++){
+  const letter=String.fromCharCode(65+i);
+  const regex=new RegExp('\\b(?:card\\s+|option\\s+|entry\\s+)?'+letter+'\\b','gi');
+  for(const m of t.matchAll(regex)){
+   const before=t.slice(Math.max(0,m.index-40),m.index).toLowerCase();
+   const after=t.slice(m.index+m[0].length,m.index+m[0].length+65).toLowerCase();
+   if(/^\s*(?:is|was)?\s*(?:the\s+)?(?:worst|terrible|awful|bad|not|loses?|disqualified)\b/.test(after)||/\b(?:not|reject|against)\s*$/.test(before))rejected.push(entrants[i]);
+   else if(/^\s*(?:is|was)?\s*(?:the\s+)?(?:best|winner|funniest|strongest|my\s+pick|wins?|gets\s+my\s+vote|takes\s+it|takes\s+the\s+point)\b/.test(after)||/\b(?:pick|choose|chose|select|vote|winner(?:\s+is)?|go\s+with)\s*$/.test(before))favored.push(entrants[i]);
+  }
+ }
+ const winners=[...new Set(favored.filter(id=>!rejected.includes(id)))];
+ return winners.length===1?{status:'suggest',id:winners[0],why:'Explicit positive vote'}:{status:'unknown',why:winners.length>1?'Conflicting votes':'No explicit selection'};
 }
 function cStatus(id){const c=st.current;return c.answers[id]?'✓ Answer locked':c.delivery[id]==='uncertain'?'⚠ Delivery uncertain':c.delivery[id]==='sent'?'Waiting for answer':'Not sent'}
 function collect(){
