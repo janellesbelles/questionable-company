@@ -77,8 +77,8 @@ function handAnswer(id,text){
  });
  if(!none&&matches.length===1)return {status:'card',answer:matches[0],why:'Exact card text'};
  if(!none&&matches.length>1)return {status:'review',suggest:'',why:'Multiple cards mentioned'};
- if(!none&&articleMatches.length===1&&matches.length===0&&!/\b(?:not|don't|didn't|reject|nope|none of those)\b[^.!?\n]{0,45}\b(?:choose|pick|play|want|go with)\b/i.test(t))return {status:'card',answer:articleMatches[0],why:'Card text matched despite a different article'};
- const numbered=t.match(/(?:^|[\n.!?]\s*)\s*(?:card|number|option|#)\s*([1-5])\b/i);
+ if(!none&&articleMatches.length===1&&matches.length===0&&/\b(?:go with|picking|pick|choosing|choose|playing|play|taking|take|submit|my answer is)\b/i.test(t)&&!/\b(?:don't like|do not like|not choosing|not picking|rejecting)\b/i.test(t))return {status:'card',answer:articleMatches[0],why:'Card text matched despite a different article'};
+ const numbered=t.match(/(?:^|[\n.!?]\s*|\b(?:choose|choosing|pick|picking|play|playing|go with)\s+)\s*(?:card|number|option|#)\s*([1-5])\b/i);
  if(!none&&numbered)return {status:'card',answer:hand[Number(numbered[1])-1],why:'Explicit card number'};
  const selection=t.match(/\b(?:i(?:'m| am)\s+(?:playing|picking|choosing|taking)|i(?:'ll| will|\s+am|\s+gonna|\s+going to)?\s+(?:play|pick|choose|take|go with)|my pick is|my choice is)\s+([^.!?\n*]{3,180})/i);
  if(!none&&selection){
