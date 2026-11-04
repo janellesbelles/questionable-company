@@ -69,7 +69,7 @@ function handAnswer(id,text){
  if(!t)return {status:'unknown',suggest:'',why:'Empty reply'};
  const hand=st.current.hands[id]||[],normalized=clean(t),none=/\b(?:none of (?:those|these)|not (?:using|choosing|picking) (?:a|any) card|original answer|freestyle answer|my own answer)\b/i.test(t);
  const wordNums={one:1,two:2,three:3,four:4,five:5};
- const writtenNumber=t.match(/\b(?:i(?:'ll| will| am|'m)\s+(?:go with|pick|choose|play|take)|i(?:'m| am)\s+(?:going with|picking|choosing|playing)|(?:go|going) with|this one(?:'s| is) got to be)\s+(?:(?:the\s+)?(?:card|option|number)\s*)?(one|two|three|four|five)\b/i);
+ const writtenNumber=t.match(/\b(?:i(?:'ll| will| am|'m)\s+(?:go with|pick|choose|play|take)|i(?:'m| am)\s+(?:going with|picking|choosing|playing|doing)|(?:go|going) with|this one(?:'s| is) got to be)\s+(?:(?:the\s+)?(?:card|option|number)\s*)?(one|two|three|four|five)\b/i);
  if(!none&&writtenNumber)return {status:'card',answer:hand[wordNums[writtenNumber[1].toLowerCase()]-1],why:'Spelled-out card number'};
  // An original announcement can be followed by the actual submission in the next sentence.
  // Never treat the literal words "an original" as the answer.
@@ -79,7 +79,7 @@ function handAnswer(id,text){
   if(!/^(?:one|an? original|something else)$/i.test(suggestion))
    return {status:'review',suggest:suggestion,why:'Original answer after announcement'};
  }
- const explicitNumber=t.match(/\b(?:i(?:'m| am)\s+(?:going with|picking|choosing|playing)|i(?:'ll| will)\s+(?:go with|pick|choose|play)|(?:go|going) with|(?:pick|choose|play|take)|this one(?:'s| is) (?:got to be )?)\s*(?:the\s+)?(?:card|option|number)?\s*(?:number\s*)?([1-5])\b/i)
+ const explicitNumber=t.match(/\b(?:i(?:'m| am)\s+(?:going with|picking|choosing|playing)|i(?:'ll| will)\s+(?:go with|pick|choose|play|do)|(?:go|going) with|(?:pick|choose|play|take)|this one(?:'s| is) (?:got to be )?)\s*(?:the\s+)?(?:card|option|number)?\s*(?:number\s*)?([1-5])\b/i)
   ||t.match(/\b(?:card|option|number)\s*([1-5])\s*(?:is|wins|for me|please|it is|the one)\b/i);
  if(!none&&explicitNumber)return {status:'card',answer:hand[Number(explicitNumber[1])-1],why:'Explicit numbered selection'};
  const selectionContext=t.match(/\b(?:i(?:'m| am)\s+(?:gonna\s+go with|going with|playing|picking|choosing)|i(?:'ll| will)\s+(?:go with|play|pick|choose)|(?:pick(?:ing)? up)\s+(?:the\s+card\s+for\s+)?|my (?:pick|choice) is)\s*([^.!?\n*]{4,190})/i);
