@@ -69,7 +69,7 @@ function handAnswer(id,text){
  if(!t)return {status:'unknown',suggest:'',why:'Empty reply'};
  const hand=st.current.hands[id]||[],normalized=clean(t),none=/\b(?:none of (?:those|these)|not (?:using|choosing|picking) (?:a|any) card|original answer|freestyle answer|my own answer)\b/i.test(t);
  const wordNums={one:1,two:2,three:3,four:4,five:5};
- const writtenNumber=t.match(/\b(?:i(?:'ll| will| am|'m)\s+(?:go with|pick|choose|play|take)|i(?:'m| am)\s+(?:going with|picking|choosing|playing)|(?:go|going) with|this one(?:'s| is) got to be)\s+(?:(?:the\s+)?(?:card|option|number)\s*)?(one|two|three|four|five)\b/i);
+ const writtenNumber=t.match(/\b(?:i(?:'ll| will| am|'m)\s+(?:go with|pick|choose|play|take)|i(?:'m| am)\s+(?:going with|picking|choosing|playing|doing)|(?:go|going) with|this one(?:'s| is) got to be)\s+(?:(?:the\s+)?(?:card|option|number)\s*)?(one|two|three|four|five)\b/i);
  if(!none&&writtenNumber)return {status:'card',answer:hand[wordNums[writtenNumber[1].toLowerCase()]-1],why:'Spelled-out card number'};
  // An original announcement can be followed by the actual submission in the next sentence.
  // Never treat the literal words "an original" as the answer.
@@ -79,7 +79,21 @@ function handAnswer(id,text){
   if(!/^(?:one|an? original|something else)$/i.test(suggestion))
    return {status:'review',suggest:suggestion,why:'Original answer after announcement'};
  }
- const explicitNumber=t.match(/\b(?:i(?:'m| am)\s+(?:going with|picking|choosing|playing)|i(?:'ll| will)\s+(?:go with|pick|choose|play)|(?:go|going) with|(?:pick|choose|play|take)|this one(?:'s| is) (?:got to be )?)\s*(?:the\s+)?(?:card|option|number)?\s*(?:number\s*)?([1-5])\b/i)
+ // An explicit "my own" declaration introduces a freestyle answer, not the answer itself.
+ const ownAnswer=t.replace(/\*[^*]*\*/g,' ').match(/\b(?:i(?:'ll| will| am|'m)\s+(?:go with|use|play|pick|choose|make(?: up)?|invent)|(?:my (?:answer|pick|choice) is))\s+(?:my own|one of my own|something of my own|an original one|something original)\s*[.!:;—–-]+\s*([^.!?\n]{4,200})/i);
+ if(ownAnswer){const value=ownAnswer[1].trim();if(!/^(?:mine|my own|something else)$/i.test(value))return {status:'review',suggest:value,why:'Original answer after my-own declaration'};}
+ // A bare numbered answer ("number five, the demon prince") is still a card pick.
+ // Only accept it at the start of the response after removing stage directions.
+ const spoken=t.replace(/\*[^*]*\*/g,' ').trim();
+ const standaloneNumber=spoken.match(/^(?:card|option|number|#)\s*(one|two|three|four|five|[1-5])\s*(?:[,.:;—–-]\s*|\s+)(.*)$/i);
+ if(!none&&standaloneNumber){
+  const ids={one:1,two:2,three:3,four:4,five:5};
+  const index=(ids[standaloneNumber[1].toLowerCase()]||Number(standaloneNumber[1]))-1;
+  const rest=clean(standaloneNumber[2]||'');
+  const card=hand[index],full=clean(card||''),core=full.replace(/^(?:a|an|the) /,'');
+  if(card&&(rest.includes(full)||rest.includes(core)||/^((that|this) one|because|i (choose|pick|want)|obviously)\b/.test(rest)))return {status:'card',answer:card,why:'Standalone numbered answer'};
+ }
+ const explicitNumber=t.match(/\b(?:i(?:'m| am)\s+(?:going with|picking|choosing|playing)|i(?:'ll| will)\s+(?:go with|pick|choose|play|do)|(?:go|going) with|(?:pick|choose|play|take)|this one(?:'s| is) (?:got to be )?)\s*(?:the\s+)?(?:card|option|number)?\s*(?:number\s*)?([1-5])\b/i)
   ||t.match(/\b(?:card|option|number)\s*([1-5])\s*(?:is|wins|for me|please|it is|the one)\b/i);
  if(!none&&explicitNumber)return {status:'card',answer:hand[Number(explicitNumber[1])-1],why:'Explicit numbered selection'};
  const selectionContext=t.match(/\b(?:i(?:'m| am)\s+(?:gonna\s+go with|going with|playing|picking|choosing)|i(?:'ll| will)\s+(?:go with|play|pick|choose)|(?:pick(?:ing)? up)\s+(?:the\s+card\s+for\s+)?|my (?:pick|choice) is)\s*([^.!?\n*]{4,190})/i);
@@ -149,6 +163,11 @@ function parseJudgment(text,entrants){
  if(!t)return {status:'unknown',why:'Empty judge reply'};
  const leading=t.match(/^\s*(?:my\s+(?:pick|vote|choice)\s*(?:is|:)?\s*)?([A-E])\s*(?:[.,):—–-]\s*|\s+)(.*)$/i);
  if(leading){const index=leading[1].toUpperCase().charCodeAt(0)-65;const tail=leading[2]||'';if(index<entrants.length&&!/^\s*(?:is\s+)?(?:the\s+)?(?:worst|bad|awful|terrible|not|loses?|disqualified|isn't|is not)\b/i.test(tail)&&!/^(?:not|never|no)\s+(?:my\s+)?(?:pick|choice|vote)\b/i.test(tail))return {status:'suggest',id:entrants[index],why:'Leading lettered ruling'};}
+ // Explicit judicial language anywhere in a reply, including after roleplay.
+ // "I rule in favor of C" means C; "I rule against C" does not.
+ const verdicts=[...t.matchAll(/\b(?:i\s+)?(?:rule|ruling|find|decide|vote|voting|cast my vote)\s+(?:in\s+favou?r\s+of|for|on\s+behalf\s+of|that\s+(?:card|entry)\s+|:)\s*(?:card|entry|option)?\s*([A-E])\b/gi)];
+ const favored=[...new Set(verdicts.map(m=>m[1].toUpperCase().charCodeAt(0)-65).filter(n=>n>=0&&n<entrants.length))];
+ if(favored.length===1)return {status:'suggest',id:entrants[favored[0]],why:'Explicit ruling in favor'};
  const picks=[],negatives=[];
  const explicit=(id,why)=>picks.push({id,why});
  for(let i=0;i<entrants.length;i++){
