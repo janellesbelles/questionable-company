@@ -95,6 +95,7 @@ function handAnswer(id,text){
  let guess='';
  if(direct){
   guess=direct[1].split(/[\n.!?]/)[0].trim();
+  if(/^(?:that|this)\s+one\b/i.test(guess)||/^one\b/i.test(guess))guess='';
  }
  const sentences=t.replace(/\*[^*]*\*/g,' ').split(/[.!?\n]+/).map(x=>x.trim()).filter(Boolean);
  if(!guess){
