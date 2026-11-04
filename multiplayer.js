@@ -68,6 +68,17 @@ function handAnswer(id,text){
  const t=String(text||'').replace(/\r/g,'').trim();
  if(!t)return {status:'unknown',suggest:'',why:'Empty reply'};
  const hand=st.current.hands[id]||[],normalized=clean(t),none=/\b(?:none of (?:those|these)|not (?:using|choosing|picking) (?:a|any) card|original answer|freestyle answer|my own answer)\b/i.test(t);
+ const wordNums={one:1,two:2,three:3,four:4,five:5};
+ const writtenNumber=t.match(/\b(?:i(?:'ll| will| am|'m)\s+(?:go with|pick|choose|play|take)|i(?:'m| am)\s+(?:going with|picking|choosing|playing)|(?:go|going) with|this one(?:'s| is) got to be)\s+(?:(?:the\s+)?(?:card|option|number)\s*)?(one|two|three|four|five)\b/i);
+ if(!none&&writtenNumber)return {status:'card',answer:hand[wordNums[writtenNumber[1].toLowerCase()]-1],why:'Spelled-out card number'};
+ // An original announcement can be followed by the actual submission in the next sentence.
+ // Never treat the literal words "an original" as the answer.
+ const originalIntro=t.replace(/\*[^*]*\*/g,' ').match(/\b(?:i(?:'m| am)\s+(?:going with|gonna go with|choosing|submitting|playing)|i(?:'ll| will)\s+(?:go with|choose|submit|play)|my answer is)\s+(?:an?\s+)?(?:original|freestyle)(?:\s+answer)?\s*[.!:—–-]+\s*([^.!?\n]{4,190})/i);
+ if(originalIntro){
+  const suggestion=originalIntro[1].trim();
+  if(!/^(?:one|an? original|something else)$/i.test(suggestion))
+   return {status:'review',suggest:suggestion,why:'Original answer after announcement'};
+ }
  const explicitNumber=t.match(/\b(?:i(?:'m| am)\s+(?:going with|picking|choosing|playing)|i(?:'ll| will)\s+(?:go with|pick|choose|play)|(?:go|going) with|(?:pick|choose|play|take)|this one(?:'s| is) (?:got to be )?)\s*(?:the\s+)?(?:card|option|number)?\s*(?:number\s*)?([1-5])\b/i)
   ||t.match(/\b(?:card|option|number)\s*([1-5])\s*(?:is|wins|for me|please|it is|the one)\b/i);
  if(!none&&explicitNumber)return {status:'card',answer:hand[Number(explicitNumber[1])-1],why:'Explicit numbered selection'};
@@ -114,7 +125,7 @@ function handAnswer(id,text){
  let guess='';
  if(direct){
   guess=direct[1].split(/[\n.!?]/)[0].trim();
-  if(/^(?:that|this)\s+one\b/i.test(guess)||/^one\b/i.test(guess))guess='';
+  if(/^(?:that|this)\s+one\b/i.test(guess)||/^one\b/i.test(guess)||/^(?:an?\s+)?(?:original|freestyle)(?:\s+answer)?\b/i.test(guess))guess='';
  }
  const sentences=t.replace(/\*[^*]*\*/g,' ').split(/[.!?\n]+/).map(x=>x.trim()).filter(Boolean);
  if(!guess){
