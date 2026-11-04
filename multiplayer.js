@@ -11,7 +11,7 @@ romance:["A handwritten love letter from the tax office.","A blind date arranged
 work:["An intern with a suspiciously large spreadsheet.","A CEO giving a keynote from a bounce house.","An office chair demanding paid leave.","A mandatory retreat to a haunted warehouse.","An HR memo written by a raccoon.","A fax machine receiving threats from the future.","A promotion awarded by coin toss.","A performance review conducted by a parrot.","A meeting that could have been a nap.","A hostile takeover by office plants."],
 fantasy:["A wizard unable to pass the driving test.","A dragon with a severe pollen allergy.","An enchanted sword requesting sick leave.","A goblin with an unreasonable mortgage.","A royal jester demanding a pension.","A prophecy written on a grocery receipt.","A talking mushroom with royal ambitions.","A knight afraid of mildly damp socks.","A spellbook containing only soup recipes.","An ancient curse of inconvenient hiccups."]
 };
-for(const [category,cards] of Object.entries(EXTRA_CARDS)){if(decks[category])decks[category].white=[...new Set([...decks[category].white,...cards])];}
+if(!window.QC_EXPANSION){for(const [category,cards] of Object.entries(EXTRA_CARDS)){if(decks[category])decks[category].white=[...new Set([...decks[category].white,...cards])];}}
 let pending=new Set(),requestErrors={},key='',nomis=[],busy=false,note='Connect your own Nomi API key to select companions.';
 let st={stage:'setup',category:'goblin',human:'',selected:[],rounds:5,round:0,scores:{},history:[],current:null,usedBlack:[],usedWhite:[]};
 try{const saved=JSON.parse(localStorage.getItem(STORE)||'null');if(saved&&saved.stage&&decks[saved.category])st={...st,...saved}}catch{}
