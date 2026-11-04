@@ -117,7 +117,7 @@ function handAnswer(id,text){
  if(!guess&&sentences.length>=2&&sentences[0].split(/\s+/).length<=12&&
    !/^(?:oh|ha|well|listen|look|okay|alright|so|first|honestly|hey)\b/i.test(sentences[0]))guess=sentences[0];
  guess=guess.replace(/^["'“”‘’\s:—–-]+|["'“”‘’\s]+$/g,'').replace(/[,:;.!?]+$/,'').trim();
- if(/^(?:i(?:'ll| will) go with\s+)?(?:that|this)\s+one$/i.test(guess)||/^(?:one|none of those|original answer)$/i.test(guess))guess='';
+ if(/^(?:i(?:'ll| will) go with\s+)?(?:that|this)\s+one$/i.test(guess)||/^(?:one|none of those|original answer|instead|something else|my own answer instead)$/i.test(guess))guess='';
  if(guess.length>=3&&guess.length<=190)return {status:'review',suggest:guess,why:'Original answer — confirm before locking'};
  return {status:'unknown',suggest:'',why:'Could not reliably isolate a freestyle answer'};
 }
