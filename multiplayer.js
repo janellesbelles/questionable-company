@@ -82,6 +82,17 @@ function handAnswer(id,text){
  // An explicit "my own" declaration introduces a freestyle answer, not the answer itself.
  const ownAnswer=t.replace(/\*[^*]*\*/g,' ').match(/\b(?:i(?:'ll| will| am|'m)\s+(?:go with|use|play|pick|choose|make(?: up)?|invent)|(?:my (?:answer|pick|choice) is))\s+(?:my own|one of my own|something of my own|an original one|something original)\s*[.!:;—–-]+\s*([^.!?\n]{4,200})/i);
  if(ownAnswer){const value=ownAnswer[1].trim();if(!/^(?:mine|my own|something else)$/i.test(value))return {status:'review',suggest:value,why:'Original answer after my-own declaration'};}
+ // A bare numbered answer ("number five, the demon prince") is still a card pick.
+ // Only accept it at the start of the response after removing stage directions.
+ const spoken=t.replace(/\*[^*]*\*/g,' ').trim();
+ const standaloneNumber=spoken.match(/^(?:card|option|number|#)\s*(one|two|three|four|five|[1-5])\s*(?:[,.:;—–-]\s*|\s+)(.*)$/i);
+ if(!none&&standaloneNumber){
+  const ids={one:1,two:2,three:3,four:4,five:5};
+  const index=(ids[standaloneNumber[1].toLowerCase()]||Number(standaloneNumber[1]))-1;
+  const rest=clean(standaloneNumber[2]||'');
+  const card=hand[index],full=clean(card||''),core=full.replace(/^(?:a|an|the) /,'');
+  if(card&&(rest.includes(full)||rest.includes(core)||/^((that|this) one|because|i (choose|pick|want)|obviously)\b/.test(rest)))return {status:'card',answer:card,why:'Standalone numbered answer'};
+ }
  const explicitNumber=t.match(/\b(?:i(?:'m| am)\s+(?:going with|picking|choosing|playing)|i(?:'ll| will)\s+(?:go with|pick|choose|play|do)|(?:go|going) with|(?:pick|choose|play|take)|this one(?:'s| is) (?:got to be )?)\s*(?:the\s+)?(?:card|option|number)?\s*(?:number\s*)?([1-5])\b/i)
   ||t.match(/\b(?:card|option|number)\s*([1-5])\s*(?:is|wins|for me|please|it is|the one)\b/i);
  if(!none&&explicitNumber)return {status:'card',answer:hand[Number(explicitNumber[1])-1],why:'Explicit numbered selection'};
