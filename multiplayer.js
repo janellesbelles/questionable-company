@@ -149,6 +149,11 @@ function parseJudgment(text,entrants){
  if(!t)return {status:'unknown',why:'Empty judge reply'};
  const leading=t.match(/^\s*(?:my\s+(?:pick|vote|choice)\s*(?:is|:)?\s*)?([A-E])\s*(?:[.,):—–-]\s*|\s+)(.*)$/i);
  if(leading){const index=leading[1].toUpperCase().charCodeAt(0)-65;const tail=leading[2]||'';if(index<entrants.length&&!/^\s*(?:is\s+)?(?:the\s+)?(?:worst|bad|awful|terrible|not|loses?|disqualified|isn't|is not)\b/i.test(tail)&&!/^(?:not|never|no)\s+(?:my\s+)?(?:pick|choice|vote)\b/i.test(tail))return {status:'suggest',id:entrants[index],why:'Leading lettered ruling'};}
+ // Explicit judicial language anywhere in a reply, including after roleplay.
+ // "I rule in favor of C" means C; "I rule against C" does not.
+ const verdicts=[...t.matchAll(/\b(?:i\s+)?(?:rule|ruling|find|decide|vote|voting|cast my vote)\s+(?:in\s+favou?r\s+of|for|on\s+behalf\s+of|that\s+(?:card|entry)\s+|:)\s*(?:card|entry|option)?\s*([A-E])\b/gi)];
+ const favored=[...new Set(verdicts.map(m=>m[1].toUpperCase().charCodeAt(0)-65).filter(n=>n>=0&&n<entrants.length))];
+ if(favored.length===1)return {status:'suggest',id:entrants[favored[0]],why:'Explicit ruling in favor'};
  const picks=[],negatives=[];
  const explicit=(id,why)=>picks.push({id,why});
  for(let i=0;i<entrants.length;i++){
