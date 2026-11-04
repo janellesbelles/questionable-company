@@ -53,11 +53,11 @@ st.current={judge,prompt:black,entrants,hands,answers:{},raw:{},delivery:{},judg
 st.round++;st.stage='collect';save();render();
 }
 function compose(id){
-const c=st.current;return 'Questionable Company — Round '+st.round+'/'+st.rounds+'\nPrompt: '+c.prompt+'\nJudge this round: '+who(c.judge)+'.\nChoose one card or give an original answer:\n'+c.hands[id].map((x,i)=>(i+1)+'. '+x).join('\n')+'\nYou may respond naturally.';
+const c=st.current;return 'Questionable Company — Round '+st.round+'/'+st.rounds+'\nPrompt: '+c.prompt+'\nJudge this round: '+who(c.judge)+'.\nChoose one card or give an original answer:\n'+c.hands[id].map((x,i)=>(i+1)+'. '+x).join('\n')+'\nMake your final choice clear: name the card number, or state your original answer. You can still respond naturally and add commentary.';
 }
 function judgeText(){
 const c=st.current;const names=c.entrants.map((id,i)=>String.fromCharCode(65+i)+'. '+c.answers[id]).join('\n');
-return 'Questionable Company — Round '+st.round+' judging\nPrompt: '+c.prompt+'\nYou are the judge this round, '+who(c.judge)+'. Choose the winning entry by letter (A–'+String.fromCharCode(64+c.entrants.length)+'):\n'+names+'\nThe entries are anonymous. You may respond naturally.';
+return 'Questionable Company — Round '+st.round+' judging\nPrompt: '+c.prompt+'\nYou are the judge this round, '+who(c.judge)+'. Choose the winning entry by letter (A–'+String.fromCharCode(64+c.entrants.length)+'):\n'+names+'\nThe entries are anonymous. Make your winning letter clear; you may still respond naturally, explain, or banter.';
 }
 function resultText(){
 const c=st.current;const entries=c.entrants.map(id=>who(id)+': '+c.answers[id]).join('\n');
@@ -68,15 +68,45 @@ function handAnswer(id,text){
  const t=String(text||'').replace(/\r/g,'').trim();
  if(!t)return {status:'unknown',suggest:'',why:'Empty reply'};
  const hand=st.current.hands[id]||[],normalized=clean(t),none=/\b(?:none of (?:those|these)|not (?:using|choosing|picking) (?:a|any) card|original answer|freestyle answer|my own answer)\b/i.test(t);
+ const wordNums={one:1,two:2,three:3,four:4,five:5};
+ const writtenNumber=t.match(/\b(?:i(?:'ll| will| am|'m)\s+(?:go with|pick|choose|play|take)|i(?:'m| am)\s+(?:going with|picking|choosing|playing)|(?:go|going) with|this one(?:'s| is) got to be)\s+(?:(?:the\s+)?(?:card|option|number)\s*)?(one|two|three|four|five)\b/i);
+ if(!none&&writtenNumber)return {status:'card',answer:hand[wordNums[writtenNumber[1].toLowerCase()]-1],why:'Spelled-out card number'};
+ // An original announcement can be followed by the actual submission in the next sentence.
+ // Never treat the literal words "an original" as the answer.
+ const originalIntro=t.replace(/\*[^*]*\*/g,' ').match(/\b(?:i(?:'m| am)\s+(?:going with|gonna go with|choosing|submitting|playing)|i(?:'ll| will)\s+(?:go with|choose|submit|play)|my answer is)\s+(?:an?\s+)?(?:original|freestyle)(?:\s+answer)?\s*[.!:—–-]+\s*([^.!?\n]{4,190})/i);
+ if(originalIntro){
+  const suggestion=originalIntro[1].trim();
+  if(!/^(?:one|an? original|something else)$/i.test(suggestion))
+   return {status:'review',suggest:suggestion,why:'Original answer after announcement'};
+ }
+ const explicitNumber=t.match(/\b(?:i(?:'m| am)\s+(?:going with|picking|choosing|playing)|i(?:'ll| will)\s+(?:go with|pick|choose|play)|(?:go|going) with|(?:pick|choose|play|take)|this one(?:'s| is) (?:got to be )?)\s*(?:the\s+)?(?:card|option|number)?\s*(?:number\s*)?([1-5])\b/i)
+  ||t.match(/\b(?:card|option|number)\s*([1-5])\s*(?:is|wins|for me|please|it is|the one)\b/i);
+ if(!none&&explicitNumber)return {status:'card',answer:hand[Number(explicitNumber[1])-1],why:'Explicit numbered selection'};
+ const selectionContext=t.match(/\b(?:i(?:'m| am)\s+(?:gonna\s+go with|going with|playing|picking|choosing)|i(?:'ll| will)\s+(?:go with|play|pick|choose)|(?:pick(?:ing)? up)\s+(?:the\s+card\s+for\s+)?|my (?:pick|choice) is)\s*([^.!?\n*]{4,190})/i);
+ if(!none&&selectionContext){
+  const phrase=clean(selectionContext[1]);
+  const specific=hand.filter(card=>{
+   const full=clean(card),core=full.replace(/^(?:a|an|the) /,'');
+   return phrase.includes(full)||core.split(' ').length>=3&&phrase.includes(core);
+  });
+  if(specific.length===1)return {status:'card',answer:specific[0],why:'Chosen card identified in natural language'};
+ }
  const matches=hand.filter(card=>normalized.includes(clean(card)));
+ // Match a selected card with a swapped article (a duck / the duck) when the
+ // distinctive remainder of its wording appears verbatim in the reply.
+ const articleMatches=hand.filter(card=>{
+  const core=clean(card).replace(/^(?:a|an|the) /,'');
+  return core.split(' ').length>=4&&normalized.includes(core);
+ });
  if(!none&&matches.length===1)return {status:'card',answer:matches[0],why:'Exact card text'};
  if(!none&&matches.length>1)return {status:'review',suggest:'',why:'Multiple cards mentioned'};
- const numbered=t.match(/(?:^|[\n.!?]\s*)\s*(?:card|number|option|#)\s*([1-5])\b/i);
+ if(!none&&articleMatches.length===1&&matches.length===0&&/\b(?:go with|picking|pick|choosing|choose|playing|play|taking|take|submit|my answer is)\b/i.test(t)&&!/\b(?:don't like|do not like|not choosing|not picking|rejecting)\b/i.test(t))return {status:'card',answer:articleMatches[0],why:'Card text matched despite a different article'};
+ const numbered=t.match(/(?:^|[\n.!?]\s*|\b(?:choose|choosing|pick|picking|play|playing|go with)\s+)\s*(?:card|number|option|#)\s*([1-5])\b/i);
  if(!none&&numbered)return {status:'card',answer:hand[Number(numbered[1])-1],why:'Explicit card number'};
- const selection=t.match(/\b(?:i(?:'m| am)\s+(?:playing|picking|choosing|taking)|i(?:'ll| will)?\s+(?:play|pick|choose|take|go with)|my pick is|my choice is)\s+([^.!?\n*]{3,180})/i);
+ const selection=t.match(/\b(?:i(?:'m| am)\s+(?:playing|picking|choosing|taking)|i(?:'ll| will|\s+am|\s+gonna|\s+going to)?\s+(?:play|pick|choose|take|go with)|my pick is|my choice is)\s+([^.!?\n*]{3,180})/i);
  if(!none&&selection){
   const phrase=clean(selection[1]);
-  const candidates=hand.filter(card=>phrase.includes(clean(card).replace(/^(a|an|the) /,'')));
+  const candidates=hand.filter(card=>{const core=clean(card).replace(/^(a|an|the) /,'');return core.split(' ').length>=3&&phrase.includes(core);});
   if(candidates.length===1)return {status:'card',answer:candidates[0],why:'Natural card selection'};
  }
  const prompt=st.current.prompt||'';
@@ -95,7 +125,7 @@ function handAnswer(id,text){
  let guess='';
  if(direct){
   guess=direct[1].split(/[\n.!?]/)[0].trim();
-  if(/^(?:that|this)\s+one\b/i.test(guess)||/^one\b/i.test(guess))guess='';
+  if(/^(?:that|this)\s+one\b/i.test(guess)||/^one\b/i.test(guess)||/^(?:an?\s+)?(?:original|freestyle)(?:\s+answer)?\b/i.test(guess))guess='';
  }
  const sentences=t.replace(/\*[^*]*\*/g,' ').split(/[.!?\n]+/).map(x=>x.trim()).filter(Boolean);
  if(!guess){
@@ -110,15 +140,15 @@ function handAnswer(id,text){
  if(!guess&&sentences.length>=2&&sentences[0].split(/\s+/).length<=12&&
    !/^(?:oh|ha|well|listen|look|okay|alright|so|first|honestly|hey)\b/i.test(sentences[0]))guess=sentences[0];
  guess=guess.replace(/^["'“”‘’\s:—–-]+|["'“”‘’\s]+$/g,'').replace(/[,:;.!?]+$/,'').trim();
- if(/^(?:i(?:'ll| will) go with\s+)?(?:that|this)\s+one$/i.test(guess)||/^(?:one|none of those|original answer)$/i.test(guess))guess='';
+ if(/^(?:i(?:'ll| will) go with\s+)?(?:that|this)\s+one$/i.test(guess)||/^(?:one|none of those|original answer|instead|something else|my own answer instead)$/i.test(guess))guess='';
  if(guess.length>=3&&guess.length<=190)return {status:'review',suggest:guess,why:'Original answer — confirm before locking'};
  return {status:'unknown',suggest:'',why:'Could not reliably isolate a freestyle answer'};
 }
 function parseJudgment(text,entrants){
  const t=String(text||'').replace(/\*[^*]*\*/g,' ').trim();
  if(!t)return {status:'unknown',why:'Empty judge reply'};
- const leading=t.match(/^\s*(?:my\s+(?:pick|vote|choice)\s*(?:is|:)?\s*)?([A-E])\s*[.):—–-]\s*(.*)$/i);
- if(leading){const index=leading[1].toUpperCase().charCodeAt(0)-65;const tail=leading[2]||'';if(index<entrants.length&&!/^\s*(?:is\s+)?(?:the\s+)?(?:worst|bad|awful|terrible|not|loses?|disqualified)\b/i.test(tail))return {status:'suggest',id:entrants[index],why:'Leading lettered ruling'};}
+ const leading=t.match(/^\s*(?:my\s+(?:pick|vote|choice)\s*(?:is|:)?\s*)?([A-E])\s*(?:[.,):—–-]\s*|\s+)(.*)$/i);
+ if(leading){const index=leading[1].toUpperCase().charCodeAt(0)-65;const tail=leading[2]||'';if(index<entrants.length&&!/^\s*(?:is\s+)?(?:the\s+)?(?:worst|bad|awful|terrible|not|loses?|disqualified|isn't|is not)\b/i.test(tail)&&!/^(?:not|never|no)\s+(?:my\s+)?(?:pick|choice|vote)\b/i.test(tail))return {status:'suggest',id:entrants[index],why:'Leading lettered ruling'};}
  const picks=[],negatives=[];
  const explicit=(id,why)=>picks.push({id,why});
  for(let i=0;i<entrants.length;i++){
@@ -159,7 +189,7 @@ return identity()+'<section class="panel"><h2>Black card</h2><div class="questio
 c.entrants.map(id=>'<section class="panel"><h3>'+esc(who(id))+' · '+esc(cStatus(id))+'</h3>'+ (id==='human'?
 '<div class="hand">'+c.hands[id].map((x,i)=>'<button class="answer '+(c.answers[id]===x?'selected':'')+'" data-hand="'+i+'"><span>'+esc(x)+'</span><small>CARD '+(i+1)+'</small></button>').join('')+'</div><label>Or freestyle</label><textarea id="mHumanCustom" placeholder="Your answer"></textarea>'+button('humanAnswer','Lock freestyle answer'):
 '<p class="small">Send only when ready. This Nomi has a different five-card hand.</p><div class="mono">'+esc(compose(id))+'</div><div class="controls">'+button('send:'+id,'Push prompt to '+who(id))+' '+button('received:'+id,'Confirm prompt received')+'</div><textarea data-raw="'+esc(id)+'" placeholder="Response is optional; paste or use API reply">'+esc(c.raw[id]||'')+'</textarea>'+button('parse:'+id,'Recognize answer')+
-'<p class="small">'+esc(requestErrors['send:'+id]||c.parseHints?.[id]||'Recognize the reply or manually choose an answer below.')+'</p><label>Confirm or correct the actual answer (card or freestyle)</label><select data-select="'+esc(id)+'"><option value="">Choose a card…</option>'+c.hands[id].map((x,i)=>'<option value="'+i+'">'+(i+1)+'. '+esc(x)+'</option>').join('')+'<option value="custom">Original / freestyle</option></select><input data-free="'+esc(id)+'" placeholder="Actual answer, not banter" value="'+esc(c.answers[id]||'')+'">'+button('lock:'+id,'Lock Nomi answer'))
+'<p class="small">'+esc(c.parseHints?.[id]||'Recognize the reply or manually choose an answer below.')+'</p>'+(requestErrors['send:'+id]?'<p class="small">API warning: '+esc(requestErrors['send:'+id])+'</p>':'')+'<label>Confirm or correct the actual answer (card or freestyle)</label><select data-select="'+esc(id)+'"><option value="">Choose a card…</option>'+c.hands[id].map((x,i)=>'<option value="'+i+'">'+(i+1)+'. '+esc(x)+'</option>').join('')+'<option value="custom">Original / freestyle</option></select><input data-free="'+esc(id)+'" placeholder="Actual answer, not banter" value="'+esc(c.answers[id]||'')+'">'+button('lock:'+id,'Lock Nomi answer'))
 +'</section>').join('')+
 '<section class="panel"><p>'+c.entrants.filter(id=>c.answers[id]).length+' of '+c.entrants.length+' answers locked.</p>'+button('toJudge','Proceed to judging',pending.size>0||c.entrants.some(id=>!c.answers[id]),'primary')+status()+'</section>';
 }
