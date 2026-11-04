@@ -69,14 +69,21 @@ function handAnswer(id,text){
  if(!t)return {status:'unknown',suggest:'',why:'Empty reply'};
  const hand=st.current.hands[id]||[],normalized=clean(t),none=/\b(?:none of (?:those|these)|not (?:using|choosing|picking) (?:a|any) card|original answer|freestyle answer|my own answer)\b/i.test(t);
  const matches=hand.filter(card=>normalized.includes(clean(card)));
+ // Match a selected card with a swapped article (a duck / the duck) when the
+ // distinctive remainder of its wording appears verbatim in the reply.
+ const articleMatches=hand.filter(card=>{
+  const core=clean(card).replace(/^(?:a|an|the) /,'');
+  return core.split(' ').length>=4&&normalized.includes(core);
+ });
  if(!none&&matches.length===1)return {status:'card',answer:matches[0],why:'Exact card text'};
  if(!none&&matches.length>1)return {status:'review',suggest:'',why:'Multiple cards mentioned'};
+ if(!none&&articleMatches.length===1&&matches.length===0&&!/\b(?:not|don't|didn't|reject|nope|none of those)\b[^.!?\n]{0,45}\b(?:choose|pick|play|want|go with)\b/i.test(t))return {status:'card',answer:articleMatches[0],why:'Card text matched despite a different article'};
  const numbered=t.match(/(?:^|[\n.!?]\s*)\s*(?:card|number|option|#)\s*([1-5])\b/i);
  if(!none&&numbered)return {status:'card',answer:hand[Number(numbered[1])-1],why:'Explicit card number'};
- const selection=t.match(/\b(?:i(?:'m| am)\s+(?:playing|picking|choosing|taking)|i(?:'ll| will)?\s+(?:play|pick|choose|take|go with)|my pick is|my choice is)\s+([^.!?\n*]{3,180})/i);
+ const selection=t.match(/\b(?:i(?:'m| am)\s+(?:playing|picking|choosing|taking)|i(?:'ll| will|\s+am|\s+gonna|\s+going to)?\s+(?:play|pick|choose|take|go with)|my pick is|my choice is)\s+([^.!?\n*]{3,180})/i);
  if(!none&&selection){
   const phrase=clean(selection[1]);
-  const candidates=hand.filter(card=>phrase.includes(clean(card).replace(/^(a|an|the) /,'')));
+  const candidates=hand.filter(card=>{const core=clean(card).replace(/^(a|an|the) /,'');return core.split(' ').length>=3&&phrase.includes(core);});
   if(candidates.length===1)return {status:'card',answer:candidates[0],why:'Natural card selection'};
  }
  const prompt=st.current.prompt||'';
