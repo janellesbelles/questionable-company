@@ -68,6 +68,18 @@ function handAnswer(id,text){
  const t=String(text||'').replace(/\r/g,'').trim();
  if(!t)return {status:'unknown',suggest:'',why:'Empty reply'};
  const hand=st.current.hands[id]||[],normalized=clean(t),none=/\b(?:none of (?:those|these)|not (?:using|choosing|picking) (?:a|any) card|original answer|freestyle answer|my own answer)\b/i.test(t);
+ const explicitNumber=t.match(/\b(?:i(?:'m| am)\s+(?:going with|picking|choosing|playing)|i(?:'ll| will)\s+(?:go with|pick|choose|play)|(?:go|going) with|(?:pick|choose|play|take)|this one(?:'s| is) (?:got to be )?)\s*(?:the\s+)?(?:card|option|number)?\s*(?:number\s*)?([1-5])\b/i)
+  ||t.match(/\b(?:card|option|number)\s*([1-5])\s*(?:is|wins|for me|please|it is|the one)\b/i);
+ if(!none&&explicitNumber)return {status:'card',answer:hand[Number(explicitNumber[1])-1],why:'Explicit numbered selection'};
+ const selectionContext=t.match(/\b(?:i(?:'m| am)\s+(?:gonna\s+go with|going with|playing|picking|choosing)|i(?:'ll| will)\s+(?:go with|play|pick|choose)|(?:pick(?:ing)? up)\s+(?:the\s+card\s+for\s+)?|my (?:pick|choice) is)\s*([^.!?\n*]{4,190})/i);
+ if(!none&&selectionContext){
+  const phrase=clean(selectionContext[1]);
+  const specific=hand.filter(card=>{
+   const full=clean(card),core=full.replace(/^(?:a|an|the) /,'');
+   return phrase.includes(full)||core.split(' ').length>=3&&phrase.includes(core);
+  });
+  if(specific.length===1)return {status:'card',answer:specific[0],why:'Chosen card identified in natural language'};
+ }
  const matches=hand.filter(card=>normalized.includes(clean(card)));
  // Match a selected card with a swapped article (a duck / the duck) when the
  // distinctive remainder of its wording appears verbatim in the reply.
@@ -166,7 +178,7 @@ return identity()+'<section class="panel"><h2>Black card</h2><div class="questio
 c.entrants.map(id=>'<section class="panel"><h3>'+esc(who(id))+' · '+esc(cStatus(id))+'</h3>'+ (id==='human'?
 '<div class="hand">'+c.hands[id].map((x,i)=>'<button class="answer '+(c.answers[id]===x?'selected':'')+'" data-hand="'+i+'"><span>'+esc(x)+'</span><small>CARD '+(i+1)+'</small></button>').join('')+'</div><label>Or freestyle</label><textarea id="mHumanCustom" placeholder="Your answer"></textarea>'+button('humanAnswer','Lock freestyle answer'):
 '<p class="small">Send only when ready. This Nomi has a different five-card hand.</p><div class="mono">'+esc(compose(id))+'</div><div class="controls">'+button('send:'+id,'Push prompt to '+who(id))+' '+button('received:'+id,'Confirm prompt received')+'</div><textarea data-raw="'+esc(id)+'" placeholder="Response is optional; paste or use API reply">'+esc(c.raw[id]||'')+'</textarea>'+button('parse:'+id,'Recognize answer')+
-'<p class="small">'+esc(requestErrors['send:'+id]||c.parseHints?.[id]||'Recognize the reply or manually choose an answer below.')+'</p><label>Confirm or correct the actual answer (card or freestyle)</label><select data-select="'+esc(id)+'"><option value="">Choose a card…</option>'+c.hands[id].map((x,i)=>'<option value="'+i+'">'+(i+1)+'. '+esc(x)+'</option>').join('')+'<option value="custom">Original / freestyle</option></select><input data-free="'+esc(id)+'" placeholder="Actual answer, not banter" value="'+esc(c.answers[id]||'')+'">'+button('lock:'+id,'Lock Nomi answer'))
+'<p class="small">'+esc(c.parseHints?.[id]||'Recognize the reply or manually choose an answer below.')+'</p>'+(requestErrors['send:'+id]?'<p class="small">API warning: '+esc(requestErrors['send:'+id])+'</p>':'')+'<label>Confirm or correct the actual answer (card or freestyle)</label><select data-select="'+esc(id)+'"><option value="">Choose a card…</option>'+c.hands[id].map((x,i)=>'<option value="'+i+'">'+(i+1)+'. '+esc(x)+'</option>').join('')+'<option value="custom">Original / freestyle</option></select><input data-free="'+esc(id)+'" placeholder="Actual answer, not banter" value="'+esc(c.answers[id]||'')+'">'+button('lock:'+id,'Lock Nomi answer'))
 +'</section>').join('')+
 '<section class="panel"><p>'+c.entrants.filter(id=>c.answers[id]).length+' of '+c.entrants.length+' answers locked.</p>'+button('toJudge','Proceed to judging',pending.size>0||c.entrants.some(id=>!c.answers[id]),'primary')+status()+'</section>';
 }
