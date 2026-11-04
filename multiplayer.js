@@ -136,8 +136,8 @@ function handAnswer(id,text){
 function parseJudgment(text,entrants){
  const t=String(text||'').replace(/\*[^*]*\*/g,' ').trim();
  if(!t)return {status:'unknown',why:'Empty judge reply'};
- const leading=t.match(/^\s*(?:my\s+(?:pick|vote|choice)\s*(?:is|:)?\s*)?([A-E])\s*[.):—–-]\s*(.*)$/i);
- if(leading){const index=leading[1].toUpperCase().charCodeAt(0)-65;const tail=leading[2]||'';if(index<entrants.length&&!/^\s*(?:is\s+)?(?:the\s+)?(?:worst|bad|awful|terrible|not|loses?|disqualified)\b/i.test(tail))return {status:'suggest',id:entrants[index],why:'Leading lettered ruling'};}
+ const leading=t.match(/^\s*(?:my\s+(?:pick|vote|choice)\s*(?:is|:)?\s*)?([A-E])\s*(?:[.,):—–-]\s*|\s+)(.*)$/i);
+ if(leading){const index=leading[1].toUpperCase().charCodeAt(0)-65;const tail=leading[2]||'';if(index<entrants.length&&!/^\s*(?:is\s+)?(?:the\s+)?(?:worst|bad|awful|terrible|not|loses?|disqualified|isn't|is not)\b/i.test(tail)&&!/^(?:not|never|no)\s+(?:my\s+)?(?:pick|choice|vote)\b/i.test(tail))return {status:'suggest',id:entrants[index],why:'Leading lettered ruling'};}
  const picks=[],negatives=[];
  const explicit=(id,why)=>picks.push({id,why});
  for(let i=0;i<entrants.length;i++){
