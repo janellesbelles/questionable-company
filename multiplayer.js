@@ -53,11 +53,11 @@ st.current={judge,prompt:black,entrants,hands,answers:{},raw:{},delivery:{},judg
 st.round++;st.stage='collect';save();render();
 }
 function compose(id){
-const c=st.current;return 'Questionable Company — Round '+st.round+'/'+st.rounds+'\nPrompt: '+c.prompt+'\nJudge this round: '+who(c.judge)+'.\nChoose one card or give an original answer:\n'+c.hands[id].map((x,i)=>(i+1)+'. '+x).join('\n')+'\nYou may respond naturally.';
+const c=st.current;return 'Questionable Company — Round '+st.round+'/'+st.rounds+'\nPrompt: '+c.prompt+'\nJudge this round: '+who(c.judge)+'.\nChoose one card or give an original answer:\n'+c.hands[id].map((x,i)=>(i+1)+'. '+x).join('\n')+'\nMake your final choice clear: name the card number, or state your original answer. You can still respond naturally and add commentary.';
 }
 function judgeText(){
 const c=st.current;const names=c.entrants.map((id,i)=>String.fromCharCode(65+i)+'. '+c.answers[id]).join('\n');
-return 'Questionable Company — Round '+st.round+' judging\nPrompt: '+c.prompt+'\nYou are the judge this round, '+who(c.judge)+'. Choose the winning entry by letter (A–'+String.fromCharCode(64+c.entrants.length)+'):\n'+names+'\nThe entries are anonymous. You may respond naturally.';
+return 'Questionable Company — Round '+st.round+' judging\nPrompt: '+c.prompt+'\nYou are the judge this round, '+who(c.judge)+'. Choose the winning entry by letter (A–'+String.fromCharCode(64+c.entrants.length)+'):\n'+names+'\nThe entries are anonymous. Make your winning letter clear; you may still respond naturally, explain, or banter.';
 }
 function resultText(){
 const c=st.current;const entries=c.entrants.map(id=>who(id)+': '+c.answers[id]).join('\n');
