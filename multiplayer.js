@@ -79,6 +79,9 @@ function handAnswer(id,text){
   if(!/^(?:one|an? original|something else)$/i.test(suggestion))
    return {status:'review',suggest:suggestion,why:'Original answer after announcement'};
  }
+ // An explicit "my own" declaration introduces a freestyle answer, not the answer itself.
+ const ownAnswer=t.replace(/\*[^*]*\*/g,' ').match(/\b(?:i(?:'ll| will| am|'m)\s+(?:go with|use|play|pick|choose|make|invent)|(?:my (?:answer|pick|choice) is))\s+(?:my own|one of my own|something of my own|an original one|something original)\s*[.!:;—–-]+\s*([^.!?\n]{4,200})/i);
+ if(ownAnswer){const value=ownAnswer[1].trim();if(!/^(?:mine|my own|something else)$/i.test(value))return {status:'review',suggest:value,why:'Original answer after my-own declaration'};}
  const explicitNumber=t.match(/\b(?:i(?:'m| am)\s+(?:going with|picking|choosing|playing)|i(?:'ll| will)\s+(?:go with|pick|choose|play|do)|(?:go|going) with|(?:pick|choose|play|take)|this one(?:'s| is) (?:got to be )?)\s*(?:the\s+)?(?:card|option|number)?\s*(?:number\s*)?([1-5])\b/i)
   ||t.match(/\b(?:card|option|number)\s*([1-5])\s*(?:is|wins|for me|please|it is|the one)\b/i);
  if(!none&&explicitNumber)return {status:'card',answer:hand[Number(explicitNumber[1])-1],why:'Explicit numbered selection'};
