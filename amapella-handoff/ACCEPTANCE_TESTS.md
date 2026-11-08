@@ -1,7 +1,7 @@
 # Acceptance tests / regression checklist
 
 ## Dataset and loading
-- [ ] Load editorial base + community pack **in order**, once, with exactly **602 black** and **1,634 white**, total **2,236** cards.
+- [ ] Load editorial base + community pack **in order**, once, with exactly **602 black** and **1,639 white**, total **2,241** cards.
 - [ ] Verify six categories (`mild, spicy, goblin, romance, work, fantasy`), category names and cards, and no exact case-insensitive duplicate white-card strings.
 - [ ] Preserve `A very short philtrum with absolutely no chill.` verbatim.
 - [ ] Preserve `The void cat's coat tenure, held in absentia.` and `A man who paid a fortune in euros to be threatened into affection.`.
