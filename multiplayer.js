@@ -163,6 +163,18 @@ function parseJudgment(text,entrants){
  if(!t)return {status:'unknown',why:'Empty judge reply'};
  const leading=t.match(/^\s*(?:my\s+(?:pick|vote|choice)\s*(?:is|:)?\s*)?([A-E])\s*(?:[.,):—–-]\s*|\s+)(.*)$/i);
  if(leading){const index=leading[1].toUpperCase().charCodeAt(0)-65;const tail=leading[2]||'';if(index<entrants.length&&!/^\s*(?:is\s+)?(?:the\s+)?(?:worst|bad|awful|terrible|not|loses?|disqualified|isn't|is not)\b/i.test(tail)&&!/^(?:not|never|no)\s+(?:my\s+)?(?:pick|choice|vote)\b/i.test(tail))return {status:'suggest',id:entrants[index],why:'Leading lettered ruling'};}
+ // Natural final decisions after roleplay: "I'm going with D", "I'll pick B",
+ // "my pick is C". Look only at affirmative decisions, not passing mentions.
+ const direct=[...t.matchAll(/\b(?:i\s*(?:'m|am)\s+(?:going|gonna\s+go)|i\s*(?:'ll|will)\s+(?:go|vote)|i\s*(?:pick|choose|select|vote\s+for)|my\s+(?:pick|choice|vote)\s+is|the\s+winner\s+is|(?:i\s+)?(?:choose|pick|select|go\s+with))\s+(?:with\s+)?(?:the\s+)?(?:(?:card|entry|option)\s+)?([A-E])\b/gi)];
+ const directIds=[...new Set(direct.map(m=>m[1].toUpperCase().charCodeAt(0)-65).filter(i=>i>=0&&i<entrants.length))];
+ if(directIds.length===1){
+   const m=direct.find(m=>m[1].toUpperCase().charCodeAt(0)-65===directIds[0]);
+   const before=t.slice(Math.max(0,m.index-26),m.index);
+   // Negated decisions are not votes. Never infer an outcome from a rejected option.
+   if(!/\b(?:not|never|don't|do not|won't|wouldn't|cannot|can't)\s*$/i.test(before))
+     return {status:'suggest',id:entrants[directIds[0]],why:'Natural-language final choice'};
+ }
+ if(directIds.length>1)return {status:'unknown',why:'Conflicting stated choices'};
  // Explicit judicial language anywhere in a reply, including after roleplay.
  // "I rule in favor of C" means C; "I rule against C" does not.
  const verdicts=[...t.matchAll(/\b(?:i\s+)?(?:rule|ruling|find|decide|vote|voting|cast my vote)\s+(?:in\s+favou?r\s+of|for|on\s+behalf\s+of|that\s+(?:card|entry)\s+|:)\s*(?:card|entry|option)?\s*([A-E])\b/gi)];
