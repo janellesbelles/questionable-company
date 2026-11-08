@@ -64,11 +64,22 @@ const c=st.current;const entries=c.entrants.map(id=>who(id)+': '+c.answers[id]).
 const scores=active().map(id=>who(id)+' '+(st.scores[id]||0)).join(' | ');
 return 'Questionable Company — Round '+st.round+' results\nPrompt: '+c.prompt+'\nJudge: '+who(c.judge)+(c.judge==='human'?'':' (rotating Nomi judge)')+'\n'+entries+'\nWinner: '+who(c.judgeChoice)+'\nScore: '+scores+'\nNext round has not started.';
 }
+function spokenBareNumber(text){
+ const stripped=String(text||'').replace(/\*[^*]*\*/g,' ').trim().replace(/[’‘]/g,"'");
+ const m=stripped.match(/^(?:(?:card|option|number|#)\s*)?(one|two|three|four|five|[1-5])\s*[.!?]*$/i);
+ if(!m)return null;
+ const nums={one:0,two:1,three:2,four:3,five:4};
+ return nums[m[1].toLowerCase()]??Number(m[1])-1;
+}
 function handAnswer(id,text){
  const t=String(text||'').replace(/\r/g,'').trim();
  if(!t)return {status:'unknown',suggest:'',why:'Empty reply'};
  const hand=st.current.hands[id]||[],normalized=clean(t),none=/\b(?:none of (?:those|these)|not (?:using|choosing|picking) (?:a|any) card|original answer|freestyle answer|my own answer)\b/i.test(t);
  const wordNums={one:1,two:2,three:3,four:4,five:5};
+ // Bare replies such as "Number one.", "Card 3", "Five." are card
+ // picks, not original answers. Require the WHOLE cleaned reply to match.
+ const bare=spokenBareNumber(t);
+ if(!none&&bare!==null&&hand[bare])return {status:'card',answer:hand[bare],why:'Bare card number'};
  const writtenNumber=t.match(/\b(?:i(?:'ll| will| am|'m)\s+(?:go with|pick|choose|play|take)|i(?:'m| am)\s+(?:going with|picking|choosing|playing|doing)|(?:go|going) with|this one(?:'s| is) got to be)\s+(?:(?:the\s+)?(?:card|option|number)\s*)?(one|two|three|four|five)\b/i);
  if(!none&&writtenNumber)return {status:'card',answer:hand[wordNums[writtenNumber[1].toLowerCase()]-1],why:'Spelled-out card number'};
  // A chosen card may be named by description BEFORE its number:
@@ -240,7 +251,7 @@ return identity()+'<section class="panel"><h2>Black card</h2><div class="questio
 c.entrants.map(id=>'<section class="panel"><h3>'+esc(who(id))+' · '+esc(cStatus(id))+'</h3>'+ (id==='human'?
 '<div class="hand">'+c.hands[id].map((x,i)=>'<button class="answer '+(c.answers[id]===x?'selected':'')+'" data-hand="'+i+'"><span>'+esc(x)+'</span><small>CARD '+(i+1)+'</small></button>').join('')+'</div><label>Or freestyle</label><textarea id="mHumanCustom" placeholder="Your answer"></textarea>'+button('humanAnswer','Lock freestyle answer'):
 '<p class="small">Send only when ready. This Nomi has a different five-card hand.</p><div class="mono">'+esc(compose(id))+'</div><div class="controls">'+button('send:'+id,'Push prompt to '+who(id))+' '+button('received:'+id,'Confirm prompt received')+'</div><textarea data-raw="'+esc(id)+'" placeholder="Response is optional; paste or use API reply">'+esc(c.raw[id]||'')+'</textarea>'+button('parse:'+id,'Recognize answer')+
-'<p class="small">'+esc(c.parseHints?.[id]||'Recognize the reply or manually choose an answer below.')+'</p>'+(requestErrors['send:'+id]?'<p class="small">API warning: '+esc(requestErrors['send:'+id])+'</p>':'')+'<label>Confirm or correct the actual answer (card or freestyle)</label><select data-select="'+esc(id)+'"><option value="">Choose a card…</option>'+c.hands[id].map((x,i)=>'<option value="'+i+'">'+(i+1)+'. '+esc(x)+'</option>').join('')+'<option value="custom">Original / freestyle</option></select><input data-free="'+esc(id)+'" placeholder="Actual answer, not banter" value="'+esc(c.answers[id]||'')+'">'+button('lock:'+id,'Lock Nomi answer'))
+'<p class="small">'+esc(c.parseHints?.[id]||'Recognize the reply or manually choose an answer below.')+'</p>'+(requestErrors['send:'+id]?'<p class="small">API warning: '+esc(requestErrors['send:'+id])+'</p>':'')+'<label>Confirm or correct the actual answer (card or freestyle)</label><select data-select="'+esc(id)+'"><option value="">Choose a card…</option>'+c.hands[id].map((x,i)=>'<option value="'+i+'" '+(c.answers[id]===x?'selected':'')+'>'+(i+1)+'. '+esc(x)+'</option>').join('')+'<option value="custom" '+(c.answers[id]&&!c.hands[id].includes(c.answers[id])?'selected':'')+'>Original / freestyle</option></select><input data-free="'+esc(id)+'" placeholder="Freestyle answer only (leave blank for a card)" value="'+esc(c.answers[id]&&!c.hands[id].includes(c.answers[id])?c.answers[id]:'')+'">'+button('lock:'+id,'Lock Nomi answer'))
 +'</section>').join('')+
 '<section class="panel"><p>'+c.entrants.filter(id=>c.answers[id]).length+' of '+c.entrants.length+' answers locked.</p>'+button('toJudge','Proceed to judging',pending.size>0||c.entrants.some(id=>!c.answers[id]),'primary')+status()+'</section>';
 }
@@ -316,7 +327,7 @@ if(action==='restart'){if(pending.size){note='Wait for pending sends before rest
 if(action==='humanAnswer'){const val=$('mHumanCustom')?.value.trim();if(val){c.answers.human=val;save();render()}return}
 if(action.startsWith('send:')){const id=action.slice(5),response=await send(id,compose(id),action);if(st.current!==c||response.cancelled)return;if(response.ok){c.delivery[id]='sent';c.raw[id]=response.data?.reply||'';note='Reply received from '+who(id)+'. Review and lock their answer.'}else c.delivery[id]='uncertain';save();render();return}
 if(action.startsWith('received:')){const id=action.slice(9);c.delivery[id]='sent';note=who(id)+' received the prompt (host confirmed).';save();render();return}
-if(action.startsWith('parse:')){const id=action.slice(6),p=handAnswer(id,c.raw[id]||'');c.parseHints=c.parseHints||{};if(p.status==='card'){c.answers[id]=p.answer;c.parseHints[id]='✓ '+p.why+': '+p.answer;note=who(id)+' answer recognized.';save();render();return}
+if(action.startsWith('parse:')){const id=action.slice(6),p=handAnswer(id,c.raw[id]||'');c.parseHints=c.parseHints||{};if(p.status==='card'){c.answers[id]=p.answer;c.parseHints[id]='✓ '+p.why+': '+p.answer;note=who(id)+' answer recognized.';save();render();const chosen=root.querySelector('[data-select="'+id+'"]'),free=root.querySelector('[data-free="'+id+'"]');if(chosen)chosen.value=String(c.hands[id].indexOf(p.answer));if(free)free.value='';return}
 c.parseHints[id]=p.suggest?'Suggested freestyle — review and lock: '+p.suggest:'No confident match. Select a card or enter the answer.';note=c.parseHints[id];save();render();const field=root.querySelector('[data-free="'+id+'"]');if(field)field.value=p.suggest||'';return}
 if(action.startsWith('lock:')){const id=action.slice(5);const sel=root.querySelector('[data-select="'+id+'"]'),txt=root.querySelector('[data-free="'+id+'"]');const val=sel?.value;const answer=val&&val!=='custom'?c.hands[id][Number(val)]:txt?.value.trim();if(!answer){note='Choose a card or enter the actual freestyle answer.';render();return}c.answers[id]=answer;save();render();return}
 if(action==='toJudge'){if(pending.size||c.entrants.some(id=>!c.answers[id]))return;st.stage='judge';save();render();return}
