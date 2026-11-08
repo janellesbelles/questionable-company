@@ -71,6 +71,27 @@ function handAnswer(id,text){
  const wordNums={one:1,two:2,three:3,four:4,five:5};
  const writtenNumber=t.match(/\b(?:i(?:'ll| will| am|'m)\s+(?:go with|pick|choose|play|take)|i(?:'m| am)\s+(?:going with|picking|choosing|playing|doing)|(?:go|going) with|this one(?:'s| is) got to be)\s+(?:(?:the\s+)?(?:card|option|number)\s*)?(one|two|three|four|five)\b/i);
  if(!none&&writtenNumber)return {status:'card',answer:hand[wordNums[writtenNumber[1].toLowerCase()]-1],why:'Spelled-out card number'};
+ // A chosen card may be named by description BEFORE its number:
+ // "I'd audition the goblin, number 5" or "I'll take that one, card five".
+ // Require a selection verb in the same sentence so casual references to
+ // card numbers in chatter cannot turn into submitted answers.
+ const spokenChoice=t.replace(/\*[^*]*\*/g,' ').replace(/[’‘]/g,"'");
+ const choiceClauses=spokenChoice.split(/[.!?\n]+/).filter(Boolean);
+ const numericNames={one:1,two:2,three:3,four:4,five:5};
+ const candidatePicks=[];
+ for(const clause of choiceClauses){
+  const numberRef=[...clause.matchAll(/\b(?:card|option|number|#)\s*([1-5]|one|two|three|four|five)\b/gi)];
+  if(!numberRef.length)continue;
+  if(!/\b(?:i(?:'d| would|'ll| will|'m| am)?\s+(?:audition|choose|pick|play|take|select|submit|vote\s+for|go(?:ing)?\s+with)|i(?:'m| am)\s+(?:going|gonna)\s+(?:to\s+)?(?:choose|pick|play|take|select)|my\s+(?:pick|choice|answer)\s+is|let'?s\s+(?:take|pick|choose|go\s+with))\b/i.test(clause))continue;
+  if(/\b(?:not|never|don't|do not|won't|wouldn't|can't|cannot)\s+(?:(?:really|actually|even)\s+)?(?:choose|pick|play|take|select|audition|go\s+with)\b/i.test(clause))continue;
+  for(const m of numberRef){
+   const idx=(numericNames[m[1].toLowerCase()]||Number(m[1]))-1;
+   if(hand[idx])candidatePicks.push(idx);
+  }
+ }
+ const distinctPicks=[...new Set(candidatePicks)];
+ if(!none&&distinctPicks.length===1)return {status:'card',answer:hand[distinctPicks[0]],why:'Card number linked to a natural selection'};
+ if(!none&&distinctPicks.length>1)return {status:'review',suggest:'',why:'Conflicting card numbers mentioned in selections'};
  // An original announcement can be followed by the actual submission in the next sentence.
  // Never treat the literal words "an original" as the answer.
  const originalIntro=t.replace(/\*[^*]*\*/g,' ').match(/\b(?:i(?:'m| am)\s+(?:going with|gonna go with|choosing|submitting|playing)|i(?:'ll| will)\s+(?:go with|choose|submit|play)|my answer is)\s+(?:an?\s+)?(?:original|freestyle)(?:\s+answer)?\s*[.!:—–-]+\s*([^.!?\n]{4,190})/i);
@@ -151,8 +172,7 @@ function handAnswer(id,text){
   if(lastRef>0)guess=sentences[lastRef-1];
  }
  if(!guess&&sentences.length===1&&sentences[0].split(/\s+/).length<=18)guess=sentences[0];
- if(!guess&&sentences.length>=2&&sentences[0].split(/\s+/).length<=12&&
-   !/^(?:oh|ha|well|listen|look|okay|alright|so|first|honestly|hey)\b/i.test(sentences[0]))guess=sentences[0];
+ // Do not mistake short opening banter for a freestyle answer.
  guess=guess.replace(/^["'“”‘’\s:—–-]+|["'“”‘’\s]+$/g,'').replace(/[,:;.!?]+$/,'').trim();
  if(/^(?:i(?:'ll| will) go with\s+)?(?:that|this)\s+one$/i.test(guess)||/^(?:one|none of those|original answer|instead|something else|my own answer instead)$/i.test(guess))guess='';
  if(guess.length>=3&&guess.length<=190)return {status:'review',suggest:guess,why:'Original answer — confirm before locking'};
