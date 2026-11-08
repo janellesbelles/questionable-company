@@ -11,14 +11,14 @@ This handoff is an adaptation brief, **not** a completed adapter or a guarantee 
 ## Exact source files (pinned to this handoff branch)
 - [index.html](../index.html) – HTML, styling, mode chooser; loads base and community decks before game engines.
 - [deck-expansion.js](../deck-expansion.js) – editorial v6 base: **600 black prompts, 1,493 white answers**.
-- [community-cards.js](../community-cards.js) – approved additions: **2 black prompts + 141 white answers**.
+- [community-cards.js](../community-cards.js) – approved additions: **2 black prompts + 146 white answers**.
 - [multiplayer.js](../multiplayer.js) – best reference for human + multi-agent turns, parser, scorekeeping, hand management, confirmation UX.
 - [game.js](../game.js) – older two-player engine, useful for solo-human-vs-agent UX and judge Brenda.
 - [api/chat.js](../api/chat.js) – Nomi-only Vercel proxy; **do not use unchanged**.
 - [api/nomis.js](../api/nomis.js) – Nomi companion enumeration, **replace** for Amapella (if Amapella discovery is supported).
 - [vercel.json](../vercel.json) – Nomi proxy's 300-second function timeout; not necessarily meaningful in Amapella.
 
-Script order matters: `deck-expansion.js`, then `community-cards.js`, then gameplay JS. `window.QC_EXPANSION` holds the category decks; the community script extends it once. With both loaded, the confirmed library is **602 black + 1,634 white = 2,236 cards**, six categories: `mild` (Mildly Cursed), `spicy`, `goblin`, `romance`, `work`, `fantasy`. The current source may supplement that library with additional *fallback* cards if the expansion object is missing; do not confuse fallback with approved deck contents. Keep each deck's category boundaries and source text. Some cards intentionally contain spicy language, niche references, or absurd phrasing.
+Script order matters: `deck-expansion.js`, then `community-cards.js`, then gameplay JS. `window.QC_EXPANSION` holds the category decks; the community script extends it once. With both loaded, the confirmed library is **602 black + 1,639 white = 2,241 cards**, six categories: `mild` (Mildly Cursed), `spicy`, `goblin`, `romance`, `work`, `fantasy`. The current source may supplement that library with additional *fallback* cards if the expansion object is missing; do not confuse fallback with approved deck contents. Keep each deck's category boundaries and source text. Some cards intentionally contain spicy language, niche references, or absurd phrasing.
 
 ## Gameplay contract — preserve this behavior
 1. Host selects category, player display names, participating agents, and round count (reference options: **5, 10, 15**).
