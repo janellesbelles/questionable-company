@@ -173,6 +173,8 @@ function handAnswer(id,text){
   guess=direct[1].split(/[\n.!?]/)[0].trim();
   if(/^(?:that|this)\s+one\b/i.test(guess)||/^one\b/i.test(guess)||/^(?:an?\s+)?(?:original|freestyle)(?:\s+answer)?\b/i.test(guess))guess='';
  }
+ // A critique of a numbered choice is not a freestyle submission.
+ if(/^\s*(?:(?:card|option|number|#)\s*)?(?:[1-5]|one|two|three|four|five)\s+(?:is|was|would be)\s+(?:a\s+)?(?:terrible|bad|awful|wrong|great|good|poor)\s+(?:choice|pick|card|answer)\s*[.!?]*$/i.test(t))return {status:'unknown',suggest:'',why:'Comment about a card, not a selection'};
  const sentences=t.replace(/\*[^*]*\*/g,' ').split(/[.!?\n]+/).map(x=>x.trim()).filter(Boolean);
  if(!guess){
   const index=sentences.findIndex(x=>/^(?:none of (?:those|these)|not (?:one of|using) those|nah[, ]|nope[, ])\b/i.test(x));
