@@ -60,3 +60,10 @@ Assume letters A-E and a valid set of anonymous entries. These must resolve as *
 
 ## Non-goals
 - No autonomous background prompting, no forced agent character voice, no shared player hand, no automatic rerolls, and no Amapella endpoint invented without verification.
+
+## Sudden-death playoff checks
+- Complete a five-round game with two tied leaders (e.g., Leo 2 / Loke 2). Do not show a final co-winner; instead offer the manual sudden-death action, with only Leo and Loke as entrants, distinct five-card hands, and a non-finalist as judge
+- Host chooses to start the playoff; no messages are automatically sent; lock entries, judge anonymously, then manually deliver results and confirm receipt before declaring the champion
+- A past saved game already showing a tied final-standings screen can launch the playoff without resetting scores, roster, or game history
+- A clear winner after the scheduled rounds ends normally with no additional round
+- If every player ties, select one rotating player to judge and let the other tied players compete; the winning entrant becomes the unique high scorer
