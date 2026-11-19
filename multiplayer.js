@@ -13,7 +13,7 @@ fantasy:["A wizard unable to pass the driving test.","A dragon with a severe pol
 };
 if(!window.QC_EXPANSION){for(const [category,cards] of Object.entries(EXTRA_CARDS)){if(decks[category])decks[category].white=[...new Set([...decks[category].white,...cards])];}}
 let pending=new Set(),requestErrors={},key='',nomis=[],busy=false,note='Connect your own Nomi API key to select companions.';
-let st={stage:'setup',category:'goblin',human:'',selected:[],rounds:5,round:0,scores:{},history:[],current:null,usedBlack:[],usedWhite:[]};
+let st={stage:'setup',category:'goblin',human:'',selected:[],rounds:5,round:0,scores:{},history:[],current:null,usedBlack:[],usedWhite:[],tiebreak:null};
 try{const saved=JSON.parse(localStorage.getItem(STORE)||'null');if(saved&&saved.stage&&decks[saved.category])st={...st,...saved}}catch{}
 const save=()=>{try{localStorage.setItem(STORE,JSON.stringify(st))}catch{}};
 const $=id=>document.getElementById(id);
@@ -23,9 +23,12 @@ const clean=x=>String(x).toLowerCase().replace(/[’‘]/g,"'").replace(/[^\p{L}
 const who=id=>id==='human'?(st.human||'Human'):(st.selected.find(n=>n.uuid===id)?.display||'Nomi');
 const active=()=>['human',...st.selected.map(n=>n.uuid)];
 const maxed=m=>m.length>LIMIT;
+function tiedLeaders(){const ids=active(),best=Math.max(...ids.map(id=>st.scores[id]||0));return ids.filter(id=>(st.scores[id]||0)===best)}
+function roundTitle(){return st.tiebreak?'Sudden death '+st.tiebreak.number:'Round '+st.round+'/'+st.rounds}
+function startTiebreak(){const tied=tiedLeaders();if(tied.length<2)return false;const outsiders=active().filter(id=>!tied.includes(id));const judge=outsiders.length?outsiders[(st.tiebreak?.number||0)%outsiders.length]:active()[st.round%active().length];st.tiebreak={number:(st.tiebreak?.number||0)+1,contenders:tied.filter(id=>id!==judge),judge};drawRound();return true}
 function status(){return '<div class="status">'+esc(note)+'</div>'}
 function button(id,label,disabled=false,cls='secondary'){return '<button class="'+cls+'" data-do="'+id+'" '+(disabled||busy||pending.has(id)?'disabled':'')+'>'+esc(pending.has(id)?'⏳ Waiting…':label)+'</button>'}
-function identity(){return '<div class="inline" style="justify-content:space-between"><span class="tag">Multi-Nomi beta · '+esc(st.stage)+'</span><span class="tag">Round '+st.round+' / '+st.rounds+'</span></div>'}
+function identity(){return '<div class="inline" style="justify-content:space-between"><span class="tag">Multi-Nomi beta · '+esc(st.stage)+'</span><span class="tag">'+esc(roundTitle())+'</span></div>'}
 function setup(){
 return '<section class="panel"><h1>Multi-Nomi courtroom 🪿</h1><p class="small">Two to five Nomis plus you. Each round, one person judges and does not submit an answer. Every message requires your click; nobody gets auto-prompted.</p>'+
 '<div class="split"><div><label>Your name</label><input id="mHuman" maxlength="35" value="'+esc(st.human)+'" placeholder="Enter your name"></div><div><label>Category</label><select id="mCategory">'+Object.entries(decks).map(([id,d])=>'<option value="'+id+'" '+(id===st.category?'selected':'')+'>'+esc(d.name)+'</option>').join('')+'</select></div></div>'+
@@ -37,8 +40,8 @@ status()+button('start','Start multiplayer game',st.selected.length<2||st.select
 '<p class="small">Your normal two-player game is untouched. <a href="/">Back to Brenda’s two-player courtroom</a>.</p></section>';
 }
 function drawRound(){
-const people=active(),judge=people[(st.round)%people.length];
-const entrants=people.filter(id=>id!==judge);
+const people=active(),judge=st.tiebreak?.judge||people[(st.round)%people.length];
+const entrants=st.tiebreak?st.tiebreak.contenders:people.filter(id=>id!==judge);
 let pool=[...new Set(decks[st.category].white)];
 if(pool.length<entrants.length*5)throw Error('Starter deck too small for this many players.');
 const fresh=shuffle(pool.filter(x=>!st.usedWhite.includes(x))),old=shuffle(pool.filter(x=>st.usedWhite.includes(x)));
@@ -49,20 +52,20 @@ const blacks=decks[st.category].black;
 let black=shuffle(blacks.filter(x=>!st.usedBlack.includes(x)))[0];
 if(!black){st.usedBlack=[];black=shuffle(blacks)[0]}
 st.usedBlack.push(black);
-st.current={judge,prompt:black,entrants,hands,answers:{},raw:{},delivery:{},judgeDelivery:{},judgeChoice:'',results:{},verified:{},commentary:'',status:'collect',parseHints:{},judgeSuggestion:''};
+st.current={judge,prompt:black,entrants,tiebreak:!!st.tiebreak,hands,answers:{},raw:{},delivery:{},judgeDelivery:{},judgeChoice:'',results:{},verified:{},commentary:'',status:'collect',parseHints:{},judgeSuggestion:''};
 st.round++;st.stage='collect';save();render();
 }
 function compose(id){
-const c=st.current;return 'Questionable Company — Round '+st.round+'/'+st.rounds+'\nPrompt: '+c.prompt+'\nJudge this round: '+who(c.judge)+'.\nChoose one card or give an original answer:\n'+c.hands[id].map((x,i)=>(i+1)+'. '+x).join('\n')+'\nMake your final choice clear: name the card number, or state your original answer. You can still respond naturally and add commentary.';
+const c=st.current;return 'Questionable Company — '+roundTitle()+'\nPrompt: '+c.prompt+'\nJudge this round: '+who(c.judge)+'.\nChoose one card or give an original answer:\n'+c.hands[id].map((x,i)=>(i+1)+'. '+x).join('\n')+'\nMake your final choice clear: name the card number, or state your original answer. You can still respond naturally and add commentary.';
 }
 function judgeText(){
 const c=st.current;const names=c.entrants.map((id,i)=>String.fromCharCode(65+i)+'. '+c.answers[id]).join('\n');
-return 'Questionable Company — Round '+st.round+' judging\nPrompt: '+c.prompt+'\nYou are the judge this round, '+who(c.judge)+'. Choose the winning entry by letter (A–'+String.fromCharCode(64+c.entrants.length)+'):\n'+names+'\nThe entries are anonymous. Make your winning letter clear; you may still respond naturally, explain, or banter.';
+return 'Questionable Company — '+roundTitle()+' judging\nPrompt: '+c.prompt+'\nYou are the judge this round, '+who(c.judge)+'. Choose the winning entry by letter (A–'+String.fromCharCode(64+c.entrants.length)+'):\n'+names+'\nThe entries are anonymous. Make your winning letter clear; you may still respond naturally, explain, or banter.';
 }
 function resultText(){
 const c=st.current;const entries=c.entrants.map(id=>who(id)+': '+c.answers[id]).join('\n');
 const scores=active().map(id=>who(id)+' '+(st.scores[id]||0)).join(' | ');
-return 'Questionable Company — Round '+st.round+' results\nPrompt: '+c.prompt+'\nJudge: '+who(c.judge)+(c.judge==='human'?'':' (rotating Nomi judge)')+'\n'+entries+'\nWinner: '+who(c.judgeChoice)+'\nScore: '+scores+'\nNext round has not started.';
+return 'Questionable Company — '+roundTitle()+' results\nPrompt: '+c.prompt+'\nJudge: '+who(c.judge)+(c.judge==='human'?'':' (rotating Nomi judge)')+'\n'+entries+'\nWinner: '+who(c.judgeChoice)+'\nScore: '+scores+'\nNext round has not started.';
 }
 function spokenBareNumber(text){
  const stripped=String(text||'').replace(/\*[^*]*\*/g,' ').trim().replace(/[’‘]/g,"'");
@@ -249,7 +252,7 @@ function parseJudgment(text,entrants){
 function cStatus(id){const c=st.current;return pending.has('send:'+id)?'⏳ Request in flight':c.answers[id]?'✓ Answer locked':c.delivery[id]==='uncertain'?'⚠ Delivery uncertain':c.delivery[id]==='sent'?'Waiting for answer':'Not sent'}
 function collect(){
 const c=st.current;
-return identity()+'<section class="panel"><h2>Black card</h2><div class="question"><strong>'+esc(c.prompt)+'</strong></div><p class="small">Judge: <b>'+esc(who(c.judge))+'</b> · Only non-judges submit. No automatic prompts.</p></section>'+
+return identity()+'<section class="panel">'+(c.tiebreak?'<h2>⚡ Sudden-death tiebreaker</h2><p class="small">Only tied leaders compete. '+esc(who(c.judge))+' judges this showdown. All sends remain manual.</p>':'')+'<h2>Black card</h2><div class="question"><strong>'+esc(c.prompt)+'</strong></div><p class="small">Judge: <b>'+esc(who(c.judge))+'</b> · Only non-judges submit. No automatic prompts.</p></section>'+
 c.entrants.map(id=>'<section class="panel"><h3>'+esc(who(id))+' · '+esc(cStatus(id))+'</h3>'+ (id==='human'?
 '<div class="hand">'+c.hands[id].map((x,i)=>'<button class="answer '+(c.answers[id]===x?'selected':'')+'" data-hand="'+i+'"><span>'+esc(x)+'</span><small>CARD '+(i+1)+'</small></button>').join('')+'</div><label>Or freestyle</label><textarea id="mHumanCustom" placeholder="Your answer"></textarea>'+button('humanAnswer','Lock freestyle answer'):
 '<p class="small">Send only when ready. This Nomi has a different five-card hand.</p><div class="mono">'+esc(compose(id))+'</div><div class="controls">'+button('send:'+id,'Push prompt to '+who(id))+' '+button('received:'+id,'Confirm prompt received')+'</div><textarea data-raw="'+esc(id)+'" placeholder="Response is optional; paste or use API reply">'+esc(c.raw[id]||'')+'</textarea>'+button('parse:'+id,'Recognize answer')+
@@ -258,7 +261,7 @@ c.entrants.map(id=>'<section class="panel"><h3>'+esc(who(id))+' · '+esc(cStatus
 '<section class="panel"><p>'+c.entrants.filter(id=>c.answers[id]).length+' of '+c.entrants.length+' answers locked.</p>'+button('toJudge','Proceed to judging',pending.size>0||c.entrants.some(id=>!c.answers[id]),'primary')+status()+'</section>';
 }
 function judging(){
-const c=st.current;return identity()+'<section class="panel"><h2>Judge: '+esc(who(c.judge))+'</h2><div class="question"><strong>'+esc(c.prompt)+'</strong></div><p class="small">Anonymous entries. The judge does not have an answer this round.</p>'+c.entrants.map((id,i)=>'<div class="choice"><h3>'+String.fromCharCode(65+i)+'. '+esc(c.answers[id])+'</h3></div>').join('')+
+const c=st.current;return identity()+'<section class="panel">'+(c.tiebreak?'<h2>⚡ Sudden death</h2>':'')+'<h2>Judge: '+esc(who(c.judge))+'</h2><div class="question"><strong>'+esc(c.prompt)+'</strong></div><p class="small">Anonymous entries. The judge does not have an answer this round.</p>'+c.entrants.map((id,i)=>'<div class="choice"><h3>'+String.fromCharCode(65+i)+'. '+esc(c.answers[id])+'</h3></div>').join('')+
 (c.judge==='human'?'<label>Pick the winning entry</label><select id="mJudgePick"><option value="">Choose…</option>'+c.entrants.map((id,i)=>'<option value="'+esc(id)+'">'+String.fromCharCode(65+i)+'</option>').join('')+'</select>'+button('judgeHuman','Lock judgment',false,'primary'):
 '<p class="small">Send the anonymous judging request to '+esc(who(c.judge))+'.</p><div class="mono">'+esc(judgeText())+'</div>'+button('judgeSend','Push judging request')+' '+button('judgeConfirm','Confirm judge received request')+
 '<textarea id="mJudgeReply" placeholder="Judge reply (API reply may fill this)">'+esc(c.commentary||'')+'</textarea>'+button('judgeParse','Recognize judge selection')+'<p class="small">'+esc(c.judgeSuggestion||'Recognized choices are suggestions; you confirm the winner.')+'</p><p class="small">Confirm or correct the judge’s winner below.</p><select id="mJudgePick"><option value="">Choose…</option>'+c.entrants.map((id,i)=>'<option value="'+esc(id)+'">'+String.fromCharCode(65+i)+'</option>').join('')+'</select>'+button('judgeHuman','Confirm judge selection'))+status()+'</section>';
@@ -268,9 +271,9 @@ const c=st.current;
 return identity()+'<section class="panel"><h1>Brenda’s court reporter 🪿</h1><p class="small">The rotating judge ruled this round. Share results individually; each Nomi has its own delivery status.</p><div class="question"><strong>'+esc(c.prompt)+'</strong></div>'+c.entrants.map(id=>'<div class="choice"><b>'+esc(who(id))+(id===c.judgeChoice?' 🏆':'')+'</b><p>'+esc(c.answers[id])+'</p></div>').join('')+
 '<h2>'+esc(who(c.judgeChoice))+' wins!</h2><p>'+active().map(id=>esc(who(id))+': '+(st.scores[id]||0)).join(' · ')+'</p></section>'+
 '<section class="panel"><h3>Results sent separately to each Nomi</h3><div class="mono">'+esc(resultText())+'</div>'+st.selected.map(n=>'<div class="multi-person"><b>'+esc(who(n.uuid))+'</b> — '+(c.verified[n.uuid]?'✓ Confirmed received':'Not confirmed')+'<div class="controls">'+button('revealSend:'+n.uuid,'Push results')+' '+button('revealConfirm:'+n.uuid,'Confirm received')+'</div>'+(requestErrors['revealSend:'+n.uuid]?'<p class="small">'+esc(requestErrors['revealSend:'+n.uuid])+'</p>':'')+'</div>').join('')+
-'<p class="small">Reactions are optional; never paste banter merely to advance. A timeout may mean the reply was slow, not that delivery failed. Check the Nomi chat before resending.</p>'+button('advance',st.round>=st.rounds?'Finish game':'Prepare next round',pending.size>0||st.selected.some(n=>!c.verified[n.uuid]),'primary')+status()+'</section>';
+'<p class="small">Reactions are optional; never paste banter merely to advance. A timeout may mean the reply was slow, not that delivery failed. Check the Nomi chat before resending.</p>'+button('advance',c.tiebreak?'Declare champion':st.round>=st.rounds?(tiedLeaders().length>1?'Start sudden-death tiebreaker':'Finish game'):'Prepare next round',pending.size>0||st.selected.some(n=>!c.verified[n.uuid]),'primary')+status()+'</section>';
 }
-function finished(){const ranked=active().map(id=>({id,points:st.scores[id]||0})).sort((a,b)=>b.points-a.points||who(a.id).localeCompare(who(b.id)));const max=ranked[0]?.points||0;const winners=ranked.filter(x=>x.points===max).map(x=>who(x.id));return '<section class="panel"><h1>CASE CLOSED 🪿</h1><h2>'+esc(winners.length===1?winners[0]+' wins!':'Tie: '+winners.join(' & '))+'</h2><h3>Final standings</h3>'+ranked.map((p,i)=>'<div class="choice"><strong>'+(i+1)+'. '+esc(who(p.id))+'</strong> — '+p.points+' point'+(p.points===1?'':'s')+'</div>').join('')+'<p class="small">'+st.history.length+' rounds completed. Brenda refuses all appeals.</p>'+button('restart','New multiplayer game')+'</section>'}
+function finished(){const ranked=active().map(id=>({id,points:st.scores[id]||0})).sort((a,b)=>b.points-a.points||who(a.id).localeCompare(who(b.id)));const max=ranked[0]?.points||0;const winners=ranked.filter(x=>x.points===max).map(x=>who(x.id));return '<section class="panel"><h1>'+ (winners.length===1?'CASE CLOSED 🪿':'⚡ DEADLOCK IN THE COURT') +'</h1><h2>'+esc(winners.length===1?winners[0]+' wins!':'Tie: '+winners.join(' & '))+'</h2>'+(winners.length>1?'<p>The leaders are tied! Play a sudden-death round with only the tied leaders. An available non-finalist judges. Nothing is sent automatically.</p>'+button('tiebreak','Play sudden-death tiebreaker',false,'primary'):'')+'<h3>Final standings</h3>'+ranked.map((p,i)=>'<div class="choice"><strong>'+(i+1)+'. '+esc(who(p.id))+'</strong> — '+p.points+' point'+(p.points===1?'':'s')+'</div>').join('')+'<p class="small">'+st.history.length+' rounds completed. Brenda refuses all appeals.</p>'+button('restart','New multiplayer game')+'</section>'}
 function helpMarkup(){return '<button id="qcHelp" type="button" aria-label="Game instructions" title="Game instructions" style="position:fixed;bottom:18px;right:18px;z-index:100;width:46px;height:46px;border-radius:50%;background:#edbc75;color:#211921;font-size:25px;font-weight:bold">?</button><div id="qcHelpOverlay" hidden style="position:fixed;inset:0;z-index:101;background:#000b;overflow:auto;padding:24px"><section role="dialog" aria-modal="true" aria-label="How to play" class="panel" style="max-width:660px;margin:4vh auto"><button id="qcHelpClose" class="secondary" style="float:right">Close ×</button><h2>How to play 🪿</h2><p>Choose a category, enter your personal Nomi API key, and select two to five Nomis. Only one player judges each round; the others receive five unique cards and can submit a card or freestyle answer.</p><p><strong>Send:</strong> You press each API send button. Nothing is sent automatically. Each Nomi receives only their own hand.</p><p><strong>Answers:</strong> Recognize the Nomi response, then review any freestyle suggestions and lock their intended answer. You can correct it manually.</p><p><strong>Judging:</strong> Anonymous entries are lettered A–E. Send the judging request to the rotating judge, recognize their choice, and confirm or correct the winner.</p><p><strong>Reveal:</strong> Send results to each Nomi or confirm they received them. Their reactions are optional. You decide when to begin the next round.</p><p><strong>Timeouts:</strong> A slow API response does not mean the message failed. Check the Nomi chat before you choose to resend. Messages are split to respect the 800-character limit.</p><p>API keys are held in this page’s memory only, not saved with game progress. Brenda is not certified to provide technical support.</p></section></div>';}
 function render(){const drafts={};root.querySelectorAll('[data-free], [data-select], #mHumanCustom, #mJudgePick').forEach(el=>{const k=el.id||el.getAttribute('data-free')||el.getAttribute('data-select');drafts[(el.tagName==='SELECT'?'select:':'input:')+k]=el.value});root.innerHTML=(st.stage==='setup'?setup():st.stage==='collect'?collect():st.stage==='judge'?judging():st.stage==='results'?results():finished())+helpMarkup();root.querySelectorAll('[data-free], [data-select], #mHumanCustom, #mJudgePick').forEach(el=>{const k=el.id||el.getAttribute('data-free')||el.getAttribute('data-select');const d=drafts[(el.tagName==='SELECT'?'select:':'input:')+k];if(d!==undefined)el.value=d})}
 async function api(path,method,body){
@@ -324,8 +327,9 @@ const action=btn.dataset.do,c=st.current;
 if(action==='connect'){key=$('mKey')?.value||key;busy=true;note='Connecting to Nomi…';render();try{const d=await api('/api/nomis','GET');nomis=d.nomis||[];const available=new Set(nomis.map(n=>n.uuid));const stale=st.selected.filter(n=>!available.has(n.uuid));if(stale.length){st.selected=st.selected.filter(n=>available.has(n.uuid));save()}note='Connected. '+nomis.length+' companions found.'+(stale.length?' Cleared '+stale.length+' unavailable saved selection(s).':'')+(st.selected.length?' '+st.selected.length+' previously selected. Use Clear selected Nomis to start fresh.':'')}catch(err){note='Connection failed: '+err.message}finally{busy=false;render()}return}
 if(action==='clearNomis'){if(st.stage!=='setup')return;st.selected=[];note='Selected Nomis cleared. Choose your players for this game.';save();render();return}
 if(action.startsWith('toggleNomi:')){const id=action.slice('toggleNomi:'.length);const found=nomis.find(n=>n.uuid===id);if(!found){note='Nomi not found in the connected list. Reconnect and try again.';render();return}const existing=st.selected.find(n=>n.uuid===id);if(existing){st.selected=st.selected.filter(n=>n.uuid!==id);note=found.name+' removed.'}else if(st.selected.length>=MAX_NOMIS){note='Maximum five Nomis in this game.'}else{st.selected.push({uuid:id,display:found.name});note=found.name+' selected.'}save();render();return}
-if(action==='start'){if(st.selected.length<2)return;st.round=0;st.scores={};active().forEach(id=>st.scores[id]=0);st.usedBlack=[];st.usedWhite=[];st.history=[];drawRound();return}
-if(action==='restart'){if(pending.size){note='Wait for pending sends before restarting.';render();return}st.stage='setup';st.round=0;st.current=null;save();render();return}
+if(action==='start'){if(st.selected.length<2)return;st.round=0;st.scores={};active().forEach(id=>st.scores[id]=0);st.usedBlack=[];st.usedWhite=[];st.history=[];st.tiebreak=null;drawRound();return}
+if(action==='restart'){if(pending.size){note='Wait for pending sends before restarting.';render();return}st.stage='setup';st.round=0;st.current=null;st.tiebreak=null;save();render();return}
+if(action==='tiebreak'){if(st.stage==='finished'&&!startTiebreak()){note='No tie remains to break.';render()}return}
 if(action==='humanAnswer'){const val=$('mHumanCustom')?.value.trim();if(val){c.answers.human=val;save();render()}return}
 if(action.startsWith('send:')){const id=action.slice(5),response=await send(id,compose(id),action);if(st.current!==c||response.cancelled)return;if(response.ok){c.delivery[id]='sent';c.raw[id]=response.data?.reply||'';note='Reply received from '+who(id)+'. Review and lock their answer.'}else c.delivery[id]='uncertain';save();render();return}
 if(action.startsWith('received:')){const id=action.slice(9);c.delivery[id]='sent';note=who(id)+' received the prompt (host confirmed).';save();render();return}
@@ -339,7 +343,7 @@ if(action==='judgeParse'){c.commentary=$('mJudgeReply')?.value||c.commentary;con
 if(action==='judgeHuman'){const winner=$('mJudgePick')?.value;if(!winner){note='Select the entry chosen by the judge.';render();return}finishJudge(winner);return}
 if(action.startsWith('revealSend:')){const id=action.slice(11),response=await send(id,resultText(),action);if(st.current!==c||response.cancelled)return;if(response.ok){c.verified[id]=true;note='Results sent to '+who(id)+'. Their reaction is optional.'}save();render();return}
 if(action.startsWith('revealConfirm:')){const id=action.slice(14);c.verified[id]=true;note='Results confirmed received by '+who(id)+'.';save();render();return}
-if(action==='advance'){if(pending.size||st.selected.some(n=>!c.verified[n.uuid]))return;st.history.push({round:st.round,prompt:c.prompt,answers:c.answers,winner:c.judgeChoice});if(st.round>=st.rounds){st.stage='finished';save();render()}else drawRound();return}
+if(action==='advance'){if(pending.size||st.selected.some(n=>!c.verified[n.uuid]))return;st.history.push({round:st.round,tiebreak:!!c.tiebreak,prompt:c.prompt,answers:c.answers,winner:c.judgeChoice});if(c.tiebreak){st.tiebreak=null;st.stage='finished';save();render()}else if(st.round>=st.rounds){if(tiedLeaders().length>1)startTiebreak();else{st.stage='finished';save();render()}}else drawRound();return}
 });
 render();
 })();
