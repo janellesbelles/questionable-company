@@ -62,10 +62,19 @@ function judgeText(){
 const c=st.current;const names=c.entrants.map((id,i)=>String.fromCharCode(65+i)+'. '+c.answers[id]).join('\n');
 return 'Questionable Company — '+roundTitle()+' judging\nPrompt: '+c.prompt+'\nYou are the judge this round, '+who(c.judge)+'. Choose the winning entry by letter (A–'+String.fromCharCode(64+c.entrants.length)+'):\n'+names+'\nThe entries are anonymous. Make your winning letter clear; you may still respond naturally, explain, or banter.';
 }
+function gameOutcome(){
+ const last=!!st.current?.tiebreak||st.round>=st.rounds;
+ if(!last)return {kind:'ongoing',message:'Game continues. Next round has not started.'};
+ const leaders=tiedLeaders();
+ if(leaders.length!==1)return {kind:'tie',message:'FINAL ROUND COMPLETE — GAME NOT OVER. Overall leaders tied: '+leaders.map(id=>who(id)+' ('+(st.scores[id]||0)+' points)').join(', ')+'. Sudden-death tiebreaker required; no overall champion yet. Tiebreaker has not started.'};
+ const id=leaders[0];
+ return {kind:'champion',id,message:'GAME OVER — OVERALL GAME CHAMPION: '+who(id)+' with '+(st.scores[id]||0)+' points. This is the winner of the entire game, not necessarily the winner of the final round. No next round.'};
+}
 function resultText(){
 const c=st.current;const entries=c.entrants.map(id=>who(id)+': '+c.answers[id]).join('\n');
 const scores=active().map(id=>who(id)+' '+(st.scores[id]||0)).join(' | ');
-return 'Questionable Company — '+roundTitle()+' results\nPrompt: '+c.prompt+'\nJudge: '+who(c.judge)+(c.judge==='human'?'':' (rotating Nomi judge)')+'\n'+entries+'\nWinner: '+who(c.judgeChoice)+'\nScore: '+scores+'\nNext round has not started.';
+const outcome=gameOutcome();
+return 'Questionable Company — '+roundTitle()+' results\nPrompt: '+c.prompt+'\nJudge: '+who(c.judge)+(c.judge==='human'?'':' (rotating Nomi judge)')+'\n'+entries+'\nROUND WINNER (this round only): '+who(c.judgeChoice)+'\nOverall score: '+scores+'\n'+outcome.message;
 }
 function spokenBareNumber(text){
  const stripped=String(text||'').replace(/\*[^*]*\*/g,' ').trim().replace(/[’‘]/g,"'");
@@ -267,9 +276,9 @@ const c=st.current;return identity()+'<section class="panel">'+(c.tiebreak?'<h2>
 '<textarea id="mJudgeReply" placeholder="Judge reply (API reply may fill this)">'+esc(c.commentary||'')+'</textarea>'+button('judgeParse','Recognize judge selection')+'<p class="small">'+esc(c.judgeSuggestion||'Recognized choices are suggestions; you confirm the winner.')+'</p><p class="small">Confirm or correct the judge’s winner below.</p><select id="mJudgePick"><option value="">Choose…</option>'+c.entrants.map((id,i)=>'<option value="'+esc(id)+'">'+String.fromCharCode(65+i)+'</option>').join('')+'</select>'+button('judgeHuman','Confirm judge selection'))+status()+'</section>';
 }
 function results(){
-const c=st.current;
+const c=st.current,outcome=gameOutcome();
 return identity()+'<section class="panel"><h1>Brenda’s court reporter 🪿</h1><p class="small">The rotating judge ruled this round. Share results individually; each Nomi has its own delivery status.</p><div class="question"><strong>'+esc(c.prompt)+'</strong></div>'+c.entrants.map(id=>'<div class="choice"><b>'+esc(who(id))+(id===c.judgeChoice?' 🏆':'')+'</b><p>'+esc(c.answers[id])+'</p></div>').join('')+
-'<h2>'+esc(who(c.judgeChoice))+' wins!</h2><p>'+active().map(id=>esc(who(id))+': '+(st.scores[id]||0)).join(' · ')+'</p></section>'+
+'<h2>Round winner: '+esc(who(c.judgeChoice))+'</h2><p>'+active().map(id=>esc(who(id))+': '+(st.scores[id]||0)).join(' · ')+'</p><h2>'+esc(outcome.kind==='champion'?'🏆 Overall game champion':outcome.kind==='tie'?'⚡ Final scores tied':'Game still in progress')+'</h2><p>'+esc(outcome.message)+'</p></section>'+
 '<section class="panel"><h3>Results sent separately to each Nomi</h3><div class="mono">'+esc(resultText())+'</div>'+st.selected.map(n=>'<div class="multi-person"><b>'+esc(who(n.uuid))+'</b> — '+(c.verified[n.uuid]?'✓ Confirmed received':'Not confirmed')+'<div class="controls">'+button('revealSend:'+n.uuid,'Push results')+' '+button('revealConfirm:'+n.uuid,'Confirm received')+'</div>'+(requestErrors['revealSend:'+n.uuid]?'<p class="small">'+esc(requestErrors['revealSend:'+n.uuid])+'</p>':'')+'</div>').join('')+
 '<p class="small">Reactions are optional; never paste banter merely to advance. A timeout may mean the reply was slow, not that delivery failed. Check the Nomi chat before resending.</p>'+button('advance',c.tiebreak?'Declare champion':st.round>=st.rounds?(tiedLeaders().length>1?'Start sudden-death tiebreaker':'Finish game'):'Prepare next round',pending.size>0||st.selected.some(n=>!c.verified[n.uuid]),'primary')+status()+'</section>';
 }
