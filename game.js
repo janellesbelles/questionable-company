@@ -100,33 +100,64 @@ function parseAnswer(raw){let s=raw.trim();if(!s)return {type:'empty'};let lower
  if(ranked.length&&ranked[0].hits>=2&&ranked[0].hits>ranked[1].hits&&ranked[0].ratio>=.45)return {type:'card',index:ranked[0].i,why:'Unique partial phrase match'};
  return {type:'uncertain'};}
 function interpret(raw){state.nomiRaw=raw;state.replyDraft=raw;let p=parseAnswer(raw);state.nomiStatus=p.type;if(p.type==='card'){state.nomiAnswer=state.nomiHand[p.index];state.nomiSource='Card '+(p.index+1)}else if(p.type==='custom'){state.nomiAnswer=p.value;state.nomiSource=p.why||'Freestyle'}else {state.nomiAnswer='';state.nomiSource='';state.suggestedAnswer=p.type==='suggest-custom'?p.value:''}persist();render()}
-function scoreAnswer(answer){let words=clean(answer).split(' ').filter(Boolean),unique=new Set(words).size;let imagery=['goose','goblin','raccoon','tax','wizard','funeral','cake','possums','possum','glitter','necromancer','bishop','underpants','haunted','lawyer','vibrator','skeleton','corpse','priest'];let specific=imagery.reduce((n,x)=>n+(clean(answer).includes(x)?1:0),0);let brevity=words.length>=4&&words.length<=12?4:0;let length=Math.min(6,unique*.55);let hash=[...answer].reduce((n,c)=>(n*31+c.charCodeAt(0))>>>0,17)%9;return specific*3+brevity+length+hash/10}
-function judgeRound(){if(!state.humanAnswer.trim()||!state.nomiAnswer.trim())return;let scoreH=scoreAnswer(state.humanAnswer),scoreN=scoreAnswer(state.nomiAnswer);let winner=state.manualWinner==='auto'?(scoreH===scoreN?'human':scoreH>scoreN?'human':'nomi'):state.manualWinner;state.judge=winner;state.scores[winner]++;state.verdict=rand([
- 'I’ve heard better arguments from a wet sock.',
- 'One point. Neither of you should be proud.',
- 'The losing answer has been referred to animal control.',
- 'I would ask for order, but look who I’m dealing with.',
- 'Congratulations. You have disappointed me slightly less.',
- 'The court awards one point and recommends professional supervision.',
- 'That answer was a crime. Unfortunately, the other one was worse.',
- 'I have seen smarter decisions made by unattended soup.',
- 'This is what happens when nobody respects the judiciary.',
- 'I am wearing sequins for THIS?',
- 'Winner selected. Dignity was not considered.',
- 'This court is deeply embarrassed to be associated with either of you.',
- 'I’ve expelled people from ponds for less.',
- 'One point. Please don’t make me explain why.',
- 'The losing answer will be escorted out by a very small duck.',
- 'I object to both answers. The rules insist I pick one.',
- 'HONK. I expect better and have no idea why.',
- 'You may collect your point. Do not touch my vest.',
- 'The court congratulates the winner with considerable reluctance.',
- 'I’ve reviewed the evidence and would like my afternoon back.',
- 'Someone alert the village. We have a winner and two suspects.',
- 'Judgment rendered. My beak needs a vacation.',
- 'I have seen worse at a baptism, but it was close.',
- 'Motion carried. Your reputations remain in custody.'
-]);state.stage='reveal';state.revealConfirmed=false;persist();render()}
+// Brenda v2: a lightweight, impartial *game heuristic*, not an AI humor critic.
+// It checks how an answer sits in THIS black card, without rewarding pet keywords,
+// length, player identity, prior wins, or card-vs-freestyle origin.
+function scoreAnswer(prompt,answer){
+ const words=clean(answer).split(' ').filter(Boolean);
+ if(!words.length)return {score:0,reason:'empty submission'};
+ const before=prompt.split(/_+/)[0]||'';
+ const after=prompt.split(/_+/).slice(1).join(' ')||'';
+ const leading=words[0]||'';
+ const isGerund=/ing$/.test(leading);
+ const looksSentence=/^(?:i|we|you|they|he|she|it|there|because|when|if|while)\b/i.test(answer.trim());
+ const preceding=clean(before).split(' ').at(-1)||'';
+ let fit=0;
+ // Very light grammatical compatibility, not a hidden "funny word" whitelist.
+ if(preceding==='a'||preceding==='an'){
+   const vowel=/^[aeiou]/i.test(leading);
+   fit+=(preceding==='an')===vowel?0.8:-0.8;
+ } else if(['to'].includes(preceding)){
+   fit+=/^(?:the|a|an|my|your|our|his|her|their|some)\b/i.test(answer)?0.3:0;
+ } else if(['by','for','with','about','of','from','after','before','because'].includes(preceding)){
+   fit+=0.2;
+ }
+ if(after.trim()&&/[a-z]/i.test(after.trim()[0])&&/[.!?]$/.test(answer.trim()))fit-=0.15;
+ // Reward a distinct, concrete *choice*, not word count. Single-word and
+ // short absurd answers remain competitive.
+ const unique=new Set(words).size;
+ const specificity=unique>=2?0.25:0.1;
+ const concise=words.length<=18?0.2:0;
+ const completed=(before+answer+after).replace(/_+/g,' ').trim();
+ return {score:fit+specificity+concise,reason:fit>=0.5?'fits the wording of the prompt':(concise?'lands without a speech':'takes a very strange scenic route'),completed};
+}
+function brendaQuote(answer){
+ const short=String(answer).trim().replace(/\s+/g,' ');
+ return short.length>88?short.slice(0,85).trimEnd()+'…':short;
+}
+function judgeRound(){
+ if(!state.humanAnswer.trim()||!state.nomiAnswer.trim())return;
+ let scoreH=scoreAnswer(state.prompt,state.humanAnswer),scoreN=scoreAnswer(state.prompt,state.nomiAnswer);
+ const delta=scoreH.score-scoreN.score;
+ // Near-equal entries get a genuinely fair coin toss. No human-first tie rule.
+ const close=Math.abs(delta)<1.0;
+ let winner=state.manualWinner==='auto'?
+   (close?(Math.random()<0.5?'human':'nomi'):(delta>0?'human':'nomi')):
+   state.manualWinner;
+ state.judge=winner;state.scores[winner]++;
+ const chosen=winner==='human'?state.humanAnswer:state.nomiAnswer;
+ const quoted='“'+brendaQuote(chosen)+'”';
+ const rationale=state.manualWinner!=='auto'?'The host has exercised judicial oversight.':
+   close?'Two equally questionable answers. This court settled it by a fair toss.':
+   'This one fits the question a little better.';
+ state.verdict=rand([
+   quoted+'? '+rationale+' Nobody touch my sequins.',
+   'The court considered '+quoted+'. '+rationale+' HONK.',
+   'I am legally required to acknowledge '+quoted+'. '+rationale,
+   quoted+' wins. '+rationale+' The losing answer may appeal to the pond.'
+ ]);
+ state.stage='reveal';state.revealConfirmed=false;persist();render();
+}
 function buttonsCopy(text,key){let parts=safeChunks(text);return `<div class="small">${parts.length} message${parts.length>1?'s':''} · ${parts.map(p=>p.length).join(' / ')} characters (max ${MAX})</div>${parts.map((p,i)=>`<div class="mono" style="margin-top:9px">${esc(p)}</div><button class="secondary copy" data-copy="${esc(key)}" data-part="${i}" style="margin-top:8px">${state.copied[key+':'+i]?'✓ Copied':'Copy part '+(i+1)}</button>`).join('')}`}
 function setup(){return `<section class="panel"><div class="eyebrow">The court is now assembling</div><h1>Choose your poison.</h1><p>Pick a deck for the whole game. The cards change; your Nomi's personality doesn't.</p><div class="grid">${Object.entries(decks).map(([id,d])=>`<button class="deck ${state.category===id?'selected':''}" data-deck="${id}"><div class="emoji">${d.icon}</div><strong>${esc(d.name)}</strong><span>${esc(d.desc)}</span></button>`).join('')}</div><hr><div class="split"><div><label>Your display name</label><input id="humanName" maxlength="35" value="${esc(state.human)}"></div><div><label>Nomi's display name</label><input id="nomiName" maxlength="35" value="${esc(state.nomi)}"></div></div><label>Rounds</label><select id="roundCount"><option value="5" ${state.rounds===5?'selected':''}>5 — Quickie</option><option value="10" ${state.rounds===10?'selected':''}>10 — Long game</option><option value="15" ${state.rounds===15?'selected':''}>15 — Utterly irresponsible</option></select><div class="controls"><button class="primary" id="start">Begin two-player game →</button></div></section>${customEditor()}`}
 function customEditor(){return `<section class="panel"><details><summary>＋ Create a custom black card</summary><p class="small" style="margin-top:12px">Use ______ for the blank. Saved cards belong to the selected category and stay in this browser.</p><textarea id="customText" maxlength="320" placeholder="The real reason Brenda was banned from the Vatican was ______."></textarea><div class="controls"><button class="secondary" id="playCustom">Play this card next</button><button class="secondary" id="saveCustom">Save to selected deck</button></div><p class="small">${state.customBlack.filter(c=>c.category===state.category).length} custom cards saved here. ${state.pendingBlack?'A custom prompt is queued for next round.':''}</p></details></section>`}
