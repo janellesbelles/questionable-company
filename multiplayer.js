@@ -206,6 +206,38 @@ function handAnswer(id,text){
 function parseJudgment(text,entrants){
  const t=String(text||'').replace(/\*[^*]*\*/g,' ').trim();
  if(!t)return {status:'unknown',why:'Empty judge reply'};
+ // Recognize affirmative judging gestures even inside *roleplay*, and
+ // winning answer text (including "a"/"the" article changes).
+ // Never finalize automatically: the host still confirms the suggestion.
+ const raw=String(text||'').replace(/[’‘]/g,"'");
+ const evidence=[];
+ for(const re of [
+  /\b(?:point(?:ing)?|gesture|gesturing|nod(?:ding)?|tap(?:ping)?|indicat(?:e|ing)|motion(?:ing)?|look(?:ing)?)\s+(?:at|to|toward|towards)\s+(?:entry|option|card|letter)?\s*([A-E])\b/gi,
+  /\b(?:the\s+)?(?:winner|winning\s+(?:card|entry|answer))\s+(?:is|:)\s*(?:entry|option|card)?\s*([A-E])\b/gi
+ ])for(const m of raw.matchAll(re)){
+  const before=raw.slice(Math.max(0,m.index-20),m.index);
+  if(/\b(?:not|never|don't|do not)\s*$/i.test(before))continue;
+  const index=m[1].toUpperCase().charCodeAt(0)-65;
+  if(index>=0&&index<entrants.length)evidence.push({id:entrants[index],why:'Judge gesture or winner letter'});
+ }
+ const normalizedRaw=clean(raw.replace(/\*[^*]*\*/g,' '));
+ for(const id of entrants){
+  const answer=st.current?.answers?.[id];
+  if(!answer)continue;
+  const phrase=clean(answer).replace(/^(?:a|an|the) /,'');
+  if(phrase.length<12)continue;
+  const position=normalizedRaw.indexOf(phrase);
+  if(position<0)continue;
+  const before=normalizedRaw.slice(Math.max(0,position-30),position);
+  const after=normalizedRaw.slice(position+phrase.length,position+70);
+  if(/\b(?:not|never|isn't|is not)\s*$/.test(before))continue;
+  if(/^\s+(?:is|was|would be)\s+(?:the\s+)?(?:winning|winner|best|funniest|my pick|my choice)\b/.test(after)||
+     /\b(?:i\s+(?:choose|pick|chose|want)|go(?:ing)?\s+with|my\s+(?:pick|choice)\s+is)\s*(?:a|an|the)?\s*$/.test(before))
+    evidence.push({id,why:'Winning answer explicitly named'});
+ }
+ const evidenceIds=[...new Set(evidence.map(e=>e.id))];
+ if(evidenceIds.length>1)return {status:'unknown',why:'Conflicting winner cues; confirm manually'};
+ if(evidenceIds.length===1)return {status:'suggest',id:evidenceIds[0],why:evidence[0].why};
  const leading=t.match(/^\s*(?:my\s+(?:pick|vote|choice)\s*(?:is|:)?\s*)?([A-E])\s*(?:[.,):—–-]\s*|\s+)(.*)$/i);
  if(leading){const index=leading[1].toUpperCase().charCodeAt(0)-65;const tail=leading[2]||'';if(index<entrants.length&&!/^\s*(?:is\s+)?(?:the\s+)?(?:worst|bad|awful|terrible|not|loses?|disqualified|isn't|is not)\b/i.test(tail)&&!/^(?:not|never|no)\s+(?:my\s+)?(?:pick|choice|vote)\b/i.test(tail))return {status:'suggest',id:entrants[index],why:'Leading lettered ruling'};}
  // Natural final decisions after roleplay: "I'm going with D", "I'll pick B",
