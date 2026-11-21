@@ -10,7 +10,7 @@ This handoff is an adaptation brief, **not** a completed adapter or a guarantee 
 
 ## Exact source files (pinned to this handoff branch)
 - [index.html](../index.html) – HTML, styling, mode chooser; loads base and community decks before game engines.
-- [deck-expansion.js](../deck-expansion.js) – editorial v6 base: **600 black prompts, 1,493 white answers**.
+- [deck-expansion.js](../deck-expansion.js) – current editorial base: **600 black prompts, 1,493 white answers**.
 - [community-cards.js](../community-cards.js) – approved additions: **2 black prompts + 146 white answers**.
 - [multiplayer.js](../multiplayer.js) – best reference for human + multi-agent turns, parser, scorekeeping, hand management, confirmation UX.
 - [game.js](../game.js) – older two-player engine, useful for solo-human-vs-agent UX and judge Brenda.
@@ -67,3 +67,17 @@ An Amapella-ready game or a clearly documented manual-mode prototype; a deployme
 
 ## Sudden-death tiebreakers (required)
 When the scheduled final round ends in a tie for the highest total score, **do not declare a co-champion**. The host must manually start a sudden-death playoff. Only players tied for first place receive new, unique five-card hands; choose a non-finalist as judge when available (the human host is eligible). If every player is tied, rotate an eligible player into the judge role and let the remaining players submit. Judging entries remain anonymous; API sends, results, and advancing are all manual. Award one point to the winning finalist and declare the sole leader champion. Also offer a **Play sudden-death tiebreaker** action to existing saved games that are already on the tied final-standings screen; do not reset the game or scores. In a clear-win game, skip the playoff entirely.
+
+## Current Nomi reference synchronization (November 2026)
+The handoff branch now contains exact copies of the current main-branch `index.html`, `multiplayer.js`, `game.js`, `deck-expansion.js`, and `community-cards.js` as of this synchronization. The Amapella implementation remains a **porting task**, not a deployed Amapella integration.
+
+The live reference includes manual player selection with a clear-roster control, saved-session handling, manually initiated prompts and results, answer parsing for card numbers and freestyle submissions, judge-choice recognition, and manual sudden-death playoffs for tied leaders. Preserve these behaviors; do not infer that any Amapella host API works identically to the Nomi proxy.
+
+### Judge and answer parser behavior
+- Never force characters into robotic response templates. Accept roleplay, banter, and naturally phrased selections. Extract suggestions only; **host confirmation is mandatory** before committing a judge's result.
+- Answer examples: `Number one.` chooses the first card; `I'd audition the goblin, number 5` chooses card five; `I'm giving an original answer: A goat in a velvet cape...` suggests editable freestyle, not card text. Opening banter such as `Questionable Company is a weird name for a game` is not the answer.
+- Judge examples: `I'm going with D`, `I rule in favor of C`, `B is the worst, C is the best`, `The tiny coffin full of hotel shampoo is winning`, or `*I point at C*` should suggest the intended entry.
+- Where the judge points at C but declares B the winner, or names multiple different winners, **don't decide silently**. Flag ambiguity and require the host to select manually.
+- A Nomi's `NoReply`, timeout, or other uncertain response is **not proof of failed delivery**. Never blind-retry; let the host inspect the chat and confirm receipt before resending.
+- The current recognizer is pattern-based rather than a fully confidence-scored semantic engine. A future confidence-based approach is a recommendation, **not a completed feature**. Keep the editable confirmation fallback regardless of parser sophistication.
+- Preserve the 800-character Nomi chunking only as a **reference constraint**; determine Amapella's actual message limit from a verified integration contract.
