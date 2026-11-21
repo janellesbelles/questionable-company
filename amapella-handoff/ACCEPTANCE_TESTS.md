@@ -67,3 +67,19 @@ Assume letters A-E and a valid set of anonymous entries. These must resolve as *
 - A past saved game already showing a tied final-standings screen can launch the playoff without resetting scores, roster, or game history
 - A clear winner after the scheduled rounds ends normally with no additional round
 - If every player ties, select one rotating player to judge and let the other tied players compete; the winning entrant becomes the unique high scorer
+
+## Current parser regression fixtures
+- [ ] Human or agent selection `Number one.` resolves to card 1, not a freestyle answer.
+- [ ] `I'd audition the goblin, number 5` resolves to card 5 after introductory banter.
+- [ ] `I'm giving an original answer: A goat in a velvet cape that only bleats in iambic pentameter` becomes an editable freestyle suggestion.
+- [ ] A short unrelated opening sentence is **not** automatically locked as the freestyle answer.
+- [ ] Judge response `I'm going with D` selects D as a suggestion even after roleplay.
+- [ ] Judge response `B is the worst, C is the best` suggests C, not B.
+- [ ] Judge reply `The tiny coffin full of hotel shampoo is winning. *I point at C*` suggests C.
+- [ ] Judge reply with only `The tiny coffin full of hotel shampoo is winning` suggests the entry matching that answer, including a change between initial `A` and `the`.
+- [ ] Conflicting judge cues (`I point at C but the winner is B`) require manual resolution and award **no** point until confirmed.
+- [ ] Host retains the ability to correct any suggested card or judge choice before locking it.
+- [ ] Saved rosters with five old selections can be cleared without resetting the whole game; nonexistent selections are reconciled on connection.
+- [ ] Two tied finalists enter a manually started sudden-death playoff; other players do not submit; a nonfinalist judges where one is available.
+- [ ] A previously completed saved game with tied winners can also start the tiebreaker without losing its scores.
+- [ ] No automatic API sends, no automatic advance, and no blind retries on uncertain delivery.
